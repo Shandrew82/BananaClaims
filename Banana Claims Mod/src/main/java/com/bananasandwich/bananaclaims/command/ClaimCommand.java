@@ -10,6 +10,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
 
+import java.util.Optional;
+
 public class ClaimCommand {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
@@ -48,7 +50,9 @@ public class ClaimCommand {
                                                 );
                                                 return 0;
                                             }
+
                                             Bananaclaims.CLAIM_STORAGE.saveClaims(Bananaclaims.CLAIM_MANAGER.getAllClaims());
+
                                             context.getSource().sendSuccess(
                                                     () -> Component.literal("Claim \"" + name + "\" created successfully."),
                                                     false
@@ -57,6 +61,43 @@ public class ClaimCommand {
                                             return 1;
                                         })
                                 )
+                        )
+
+                        .then(Commands.literal("info")
+                                .executes(context -> {
+                                    ServerPlayer player = context.getSource().getPlayerOrException();
+                                    ChunkPos chunkPos = player.chunkPosition();
+                                    String dimension = player.level().dimension().toString();
+
+                                    Optional<Claim> optionalClaim = Bananaclaims.CLAIM_MANAGER.getClaimAt(
+                                            dimension,
+                                            chunkPos.x(),
+                                            chunkPos.z()
+                                    );
+
+                                    if (optionalClaim.isEmpty()) {
+                                        context.getSource().sendSuccess(
+                                                () -> Component.literal("You are standing in Wilderness."),
+                                                false
+                                        );
+                                        return 1;
+                                    }
+
+                                    Claim claim = optionalClaim.get();
+
+                                    context.getSource().sendSuccess(
+                                            () -> Component.literal(
+                                                    "Claim: " + claim.getName()
+                                                            + "\nOwner: " + claim.getOwnerName()
+                                                            + "\nDescription: " + (claim.getDescription().isBlank() ? "No description." : claim.getDescription())
+                                                            + "\nDimension: " + claim.getDimension()
+                                                            + "\nChunk: " + claim.getChunkX() + ", " + claim.getChunkZ()
+                                            ),
+                                            false
+                                    );
+
+                                    return 1;
+                                })
                         )
         );
     }
