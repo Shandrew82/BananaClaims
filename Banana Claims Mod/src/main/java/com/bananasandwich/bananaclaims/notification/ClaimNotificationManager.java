@@ -13,7 +13,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 public class ClaimNotificationManager {
-    private static final Map<UUID, String> LAST_KNOWN_CLAIMS = new HashMap<>();
+    private static final Map<UUID, LastKnownClaim> LAST_KNOWN_CLAIMS = new HashMap<>();
 
     public static void register() {
         ServerTickEvents.END_SERVER_TICK.register(server -> {
@@ -35,41 +35,43 @@ public class ClaimNotificationManager {
                 chunkPos.z()
         );
 
-        String currentClaimKey = currentClaim
-                .map(ClaimNotificationManager::getClaimKey)
+        LastKnownClaim currentKnownClaim = currentClaim
+                .map(ClaimNotificationManager::toLastKnownClaim)
                 .orElse(null);
 
-        String previousClaimKey = LAST_KNOWN_CLAIMS.get(playerUuid);
+        LastKnownClaim previousKnownClaim = LAST_KNOWN_CLAIMS.get(playerUuid);
 
-        if (sameClaim(previousClaimKey, currentClaimKey)) {
+        if (sameClaim(previousKnownClaim, currentKnownClaim)) {
             return;
         }
 
-        if (currentClaim.isPresent()) {
-            Claim claim = currentClaim.get();
+        if (previousKnownClaim != null) {
             player.sendSystemMessage(
-                    Component.literal("Entering claim: " + claim.getName()),
-                    true
-            );
-        } else if (previousClaimKey != null) {
-            player.sendSystemMessage(
-                    Component.literal("Leaving claim"),
+                    Component.literal("Leaving claim: " + previousKnownClaim.name),
                     true
             );
         }
 
-        if (currentClaimKey == null) {
-            LAST_KNOWN_CLAIMS.remove(playerUuid);
+        if (currentKnownClaim != null) {
+            player.sendSystemMessage(
+                    Component.literal("Entering claim: " + currentKnownClaim.name),
+                    true
+            );
+
+            LAST_KNOWN_CLAIMS.put(playerUuid, currentKnownClaim);
         } else {
-            LAST_KNOWN_CLAIMS.put(playerUuid, currentClaimKey);
+            LAST_KNOWN_CLAIMS.remove(playerUuid);
         }
     }
 
-    private static String getClaimKey(Claim claim) {
-        return claim.getOwnerUuid() + "|" + claim.getName();
+    private static LastKnownClaim toLastKnownClaim(Claim claim) {
+        return new LastKnownClaim(
+                claim.getOwnerUuid() + "|" + claim.getName(),
+                claim.getName()
+        );
     }
 
-    private static boolean sameClaim(String first, String second) {
+    private static boolean sameClaim(LastKnownClaim first, LastKnownClaim second) {
         if (first == null && second == null) {
             return true;
         }
@@ -78,6 +80,16 @@ public class ClaimNotificationManager {
             return false;
         }
 
-        return first.equals(second);
+        return first.key.equals(second.key);
+    }
+
+    private static class LastKnownClaim {
+        private final String key;
+        private final String name;
+
+        private LastKnownClaim(String key, String name) {
+            this.key = key;
+            this.name = name;
+        }
     }
 }
