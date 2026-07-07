@@ -27,6 +27,7 @@ public class ClaimCommand {
                         .then(RenameClaimCommand.register())
                         .then(DescriptionClaimCommand.register())
                         .then(FlagClaimCommand.register())
+                        .then(PopupClaimCommand.register())
         );
     }
 }
