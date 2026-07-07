@@ -2,6 +2,7 @@ package com.bananasandwich.bananaclaims.notification;
 
 import com.bananasandwich.bananaclaims.Bananaclaims;
 import com.bananasandwich.bananaclaims.claim.Claim;
+import com.bananasandwich.bananaclaims.claim.ClaimPopupSettings;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.network.chat.Component;
@@ -60,28 +61,45 @@ public class ClaimNotificationManager {
         }
 
         if (previousKnownClaim != null) {
-            player.sendSystemMessage(
-                    Component.literal("Leaving claim: " + previousKnownClaim.name),
-                    true
-            );
+            sendLeaveMessage(player, previousKnownClaim);
         }
 
         if (currentKnownClaim != null) {
-            player.sendSystemMessage(
-                    Component.literal("Entering claim: " + currentKnownClaim.name),
-                    true
-            );
-
+            sendEnterMessage(player, currentKnownClaim);
             LAST_KNOWN_CLAIMS.put(playerUuid, currentKnownClaim);
         } else {
             LAST_KNOWN_CLAIMS.remove(playerUuid);
         }
     }
 
+    private static void sendEnterMessage(ServerPlayer player, LastKnownClaim knownClaim) {
+        String message = knownClaim.enterTitle;
+
+        if (message == null || message.isBlank()) {
+            message = "Entering " + knownClaim.name;
+        }
+
+        player.sendSystemMessage(Component.literal(message), true);
+    }
+
+    private static void sendLeaveMessage(ServerPlayer player, LastKnownClaim knownClaim) {
+        String message = knownClaim.leaveTitle;
+
+        if (message == null || message.isBlank()) {
+            message = "Leaving " + knownClaim.name;
+        }
+
+        player.sendSystemMessage(Component.literal(message), true);
+    }
+
     private static LastKnownClaim toLastKnownClaim(Claim claim) {
+        ClaimPopupSettings popupSettings = claim.getPopupSettings();
+
         return new LastKnownClaim(
                 claim.getOwnerUuid() + "|" + claim.getName(),
-                claim.getName()
+                claim.getName(),
+                popupSettings.getEnterTitle(),
+                popupSettings.getLeaveTitle()
         );
     }
 
@@ -100,10 +118,14 @@ public class ClaimNotificationManager {
     private static class LastKnownClaim {
         private final String key;
         private final String name;
+        private final String enterTitle;
+        private final String leaveTitle;
 
-        private LastKnownClaim(String key, String name) {
+        private LastKnownClaim(String key, String name, String enterTitle, String leaveTitle) {
             this.key = key;
             this.name = name;
+            this.enterTitle = enterTitle;
+            this.leaveTitle = leaveTitle;
         }
     }
 }
