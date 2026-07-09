@@ -3,11 +3,13 @@ package com.bananasandwich.bananaclaims.command;
 import com.bananasandwich.bananaclaims.Bananaclaims;
 import com.bananasandwich.bananaclaims.claim.Claim;
 import com.bananasandwich.bananaclaims.claim.PopupDisplayMode;
+import com.bananasandwich.bananaclaims.notification.PopupRenderer;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Optional;
 
@@ -16,6 +18,21 @@ public class PopupClaimCommand {
     public static LiteralArgumentBuilder<CommandSourceStack> register() {
         return Commands.literal("popup")
                 .then(Commands.argument("claim", StringArgumentType.word())
+                        .then(Commands.literal("preview")
+                                .then(Commands.literal("enter")
+                                        .executes(context -> previewEnter(
+                                                context.getSource(),
+                                                StringArgumentType.getString(context, "claim")
+                                        ))
+                                )
+                                .then(Commands.literal("leave")
+                                        .executes(context -> previewLeave(
+                                                context.getSource(),
+                                                StringArgumentType.getString(context, "claim")
+                                        ))
+                                )
+                        )
+
                         .then(Commands.literal("set")
                                 .then(Commands.literal("mode")
                                         .then(Commands.argument("mode", StringArgumentType.word())
@@ -88,6 +105,48 @@ public class PopupClaimCommand {
                                 )
                         )
                 );
+    }
+
+    private static int previewEnter(CommandSourceStack source, String claimName) {
+        ServerPlayer player;
+
+        try {
+            player = source.getPlayerOrException();
+        } catch (Exception exception) {
+            source.sendFailure(Component.literal("Only players can preview claim popups."));
+            return 0;
+        }
+
+        Optional<Claim> optionalClaim = findClaim(claimName);
+
+        if (optionalClaim.isEmpty()) {
+            source.sendFailure(Component.literal("No claim found named \"" + claimName + "\"."));
+            return 0;
+        }
+
+        PopupRenderer.showEnter(player, optionalClaim.get());
+        return 1;
+    }
+
+    private static int previewLeave(CommandSourceStack source, String claimName) {
+        ServerPlayer player;
+
+        try {
+            player = source.getPlayerOrException();
+        } catch (Exception exception) {
+            source.sendFailure(Component.literal("Only players can preview claim popups."));
+            return 0;
+        }
+
+        Optional<Claim> optionalClaim = findClaim(claimName);
+
+        if (optionalClaim.isEmpty()) {
+            source.sendFailure(Component.literal("No claim found named \"" + claimName + "\"."));
+            return 0;
+        }
+
+        PopupRenderer.showLeave(player, optionalClaim.get());
+        return 1;
     }
 
     private static int setMode(CommandSourceStack source, String claimName, String modeText) {
