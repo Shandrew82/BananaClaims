@@ -19,31 +19,71 @@ public class PopupClaimCommand {
                         .then(Commands.literal("set")
                                 .then(Commands.literal("mode")
                                         .then(Commands.argument("mode", StringArgumentType.word())
-                                                .executes(context -> setMode(context.getSource(), StringArgumentType.getString(context, "claim"), StringArgumentType.getString(context, "mode")))
+                                                .executes(context -> setMode(
+                                                        context.getSource(),
+                                                        StringArgumentType.getString(context, "claim"),
+                                                        StringArgumentType.getString(context, "mode")
+                                                ))
                                         )
                                 )
 
                                 .then(Commands.literal("enterTitle")
                                         .then(Commands.argument("text", StringArgumentType.greedyString())
-                                                .executes(context -> setEnterTitle(context.getSource(), StringArgumentType.getString(context, "claim"), StringArgumentType.getString(context, "text")))
+                                                .executes(context -> setEnterTitle(
+                                                        context.getSource(),
+                                                        StringArgumentType.getString(context, "claim"),
+                                                        StringArgumentType.getString(context, "text")
+                                                ))
                                         )
                                 )
 
                                 .then(Commands.literal("enterSubtitle")
                                         .then(Commands.argument("text", StringArgumentType.greedyString())
-                                                .executes(context -> setEnterSubtitle(context.getSource(), StringArgumentType.getString(context, "claim"), StringArgumentType.getString(context, "text")))
+                                                .executes(context -> setEnterSubtitle(
+                                                        context.getSource(),
+                                                        StringArgumentType.getString(context, "claim"),
+                                                        StringArgumentType.getString(context, "text")
+                                                ))
                                         )
                                 )
 
                                 .then(Commands.literal("leaveTitle")
                                         .then(Commands.argument("text", StringArgumentType.greedyString())
-                                                .executes(context -> setLeaveTitle(context.getSource(), StringArgumentType.getString(context, "claim"), StringArgumentType.getString(context, "text")))
+                                                .executes(context -> setLeaveTitle(
+                                                        context.getSource(),
+                                                        StringArgumentType.getString(context, "claim"),
+                                                        StringArgumentType.getString(context, "text")
+                                                ))
                                         )
                                 )
 
                                 .then(Commands.literal("leaveSubtitle")
                                         .then(Commands.argument("text", StringArgumentType.greedyString())
-                                                .executes(context -> setLeaveSubtitle(context.getSource(), StringArgumentType.getString(context, "claim"), StringArgumentType.getString(context, "text")))
+                                                .executes(context -> setLeaveSubtitle(
+                                                        context.getSource(),
+                                                        StringArgumentType.getString(context, "claim"),
+                                                        StringArgumentType.getString(context, "text")
+                                                ))
+                                        )
+                                )
+
+                                .then(Commands.literal("enterSound")
+                                        .then(Commands.argument("sound", StringArgumentType.greedyString())
+                                                .executes(context -> setEnterSound(
+                                                        context.getSource(),
+                                                        StringArgumentType.getString(context, "claim"),
+                                                        StringArgumentType.getString(context, "sound")
+                                                ))
+                                        )
+                                )
+
+                                .then(Commands.literal("leaveSound")
+                                        .then(Commands.argument("sound", StringArgumentType.greedyString())
+                                                .executes(context -> setLeaveSound(
+                                                        context.getSource(),
+                                                        StringArgumentType.getString(context, "claim"),
+                                                        StringArgumentType.getString(context, "sound")
+                                                ))
                                         )
                                 )
                         )
@@ -157,6 +197,64 @@ public class PopupClaimCommand {
         );
 
         return 1;
+    }
+
+    private static int setEnterSound(CommandSourceStack source, String claimName, String sound) {
+        Optional<Claim> optionalClaim = findClaim(claimName);
+
+        if (optionalClaim.isEmpty()) {
+            source.sendFailure(Component.literal("No claim found named \"" + claimName + "\"."));
+            return 0;
+        }
+
+        Claim claim = optionalClaim.get();
+        claim.getPopupSettings().setEnterSound(normalizeSound(sound));
+        Bananaclaims.CLAIM_MANAGER.saveClaims();
+
+        source.sendSuccess(
+                () -> Component.literal("Set enter sound for \"" + claim.getName() + "\" to \"" + claim.getPopupSettings().getEnterSound() + "\"."),
+                false
+        );
+
+        return 1;
+    }
+
+    private static int setLeaveSound(CommandSourceStack source, String claimName, String sound) {
+        Optional<Claim> optionalClaim = findClaim(claimName);
+
+        if (optionalClaim.isEmpty()) {
+            source.sendFailure(Component.literal("No claim found named \"" + claimName + "\"."));
+            return 0;
+        }
+
+        Claim claim = optionalClaim.get();
+        claim.getPopupSettings().setLeaveSound(normalizeSound(sound));
+        Bananaclaims.CLAIM_MANAGER.saveClaims();
+
+        source.sendSuccess(
+                () -> Component.literal("Set leave sound for \"" + claim.getName() + "\" to \"" + claim.getPopupSettings().getLeaveSound() + "\"."),
+                false
+        );
+
+        return 1;
+    }
+
+    private static String normalizeSound(String sound) {
+        if (sound == null) {
+            return "";
+        }
+
+        String trimmedSound = sound.trim();
+
+        if (trimmedSound.equalsIgnoreCase("none")
+                || trimmedSound.equalsIgnoreCase("clear")
+                || trimmedSound.equalsIgnoreCase("off")
+                || trimmedSound.equalsIgnoreCase("disable")
+                || trimmedSound.equalsIgnoreCase("disabled")) {
+            return "";
+        }
+
+        return trimmedSound;
     }
 
     private static Optional<Claim> findClaim(String claimName) {

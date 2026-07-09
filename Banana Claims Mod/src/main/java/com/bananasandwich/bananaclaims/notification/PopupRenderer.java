@@ -3,6 +3,7 @@ package com.bananasandwich.bananaclaims.notification;
 import com.bananasandwich.bananaclaims.claim.Claim;
 import com.bananasandwich.bananaclaims.claim.ClaimPopupSettings;
 import com.bananasandwich.bananaclaims.claim.PopupDisplayMode;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
@@ -10,7 +11,10 @@ import net.minecraft.network.chat.TextColor;
 import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundSource;
 
 public class PopupRenderer {
 
@@ -29,6 +33,7 @@ public class PopupRenderer {
         }
 
         render(player, claim, settings.getDisplayMode(), title, subtitle);
+        playSound(player, settings.getEnterSound());
     }
 
     public static void showLeave(ServerPlayer player, Claim claim) {
@@ -46,6 +51,7 @@ public class PopupRenderer {
         }
 
         render(player, claim, settings.getDisplayMode(), title, subtitle);
+        playSound(player, settings.getLeaveSound());
     }
 
     private static void render(ServerPlayer player, Claim claim, PopupDisplayMode displayMode, String title, String subtitle) {
@@ -59,6 +65,35 @@ public class PopupRenderer {
             case CHAT -> renderChat(player, titleComponent, subtitleComponent);
             case ACTIONBAR -> renderActionBar(player, titleComponent, subtitleComponent);
         }
+    }
+
+    private static void playSound(ServerPlayer player, String soundId) {
+        if (soundId == null || soundId.isBlank()) {
+            return;
+        }
+
+        Identifier identifier = Identifier.tryParse(soundId.trim());
+
+        if (identifier == null) {
+            return;
+        }
+
+        SoundEvent soundEvent = BuiltInRegistries.SOUND_EVENT.getValue(identifier);
+
+        if (soundEvent == null) {
+            return;
+        }
+
+        player.level().playSound(
+                null,
+                player.getX(),
+                player.getY(),
+                player.getZ(),
+                soundEvent,
+                SoundSource.PLAYERS,
+                1.0F,
+                1.0F
+        );
     }
 
     private static String applyPlaceholders(String text, Claim claim) {
