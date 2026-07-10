@@ -272,23 +272,65 @@ public class PopupClaimCommand {
         return 1;
     }
 
+    private static Optional<Claim> findEditableClaim(
+            CommandSourceStack source,
+            String claimName
+    ) {
+        ServerPlayer player;
+
+        try {
+            player = source.getPlayerOrException();
+        } catch (Exception exception) {
+            source.sendFailure(
+                    Component.literal(
+                            "Only players can edit claim popups."
+                    )
+            );
+            return Optional.empty();
+        }
+
+        Optional<Claim> optionalClaim =
+                ClaimResolver.findManagedByName(
+                        player.getUUID(),
+                        claimName
+                );
+
+        if (optionalClaim.isEmpty()) {
+            source.sendFailure(
+                    Component.literal(
+                            "You cannot manage a claim named \""
+                                    + claimName
+                                    + "\"."
+                    )
+            );
+            return Optional.empty();
+        }
+
+        Claim claim = optionalClaim.get();
+
+        if (!claim.canEditPopup(player.getUUID())) {
+            source.sendFailure(
+                    Component.literal(
+                            "You cannot edit popup settings for claim \""
+                                    + claim.getName()
+                                    + "\"."
+                    )
+            );
+            return Optional.empty();
+        }
+
+        return optionalClaim;
+    }
+
     private static int setMode(
             CommandSourceStack source,
             String claimName,
             String modeText
     ) {
         Optional<Claim> optionalClaim =
-                ClaimResolver.findByName(claimName);
+                findEditableClaim(source, claimName);
 
         if (optionalClaim.isEmpty()) {
-            source.sendFailure(
-                    Component.literal(
-                            "No claim found named \""
-                                    + claimName
-                                    + "\"."
-                    )
-            );
-
             return 0;
         }
 
@@ -333,17 +375,9 @@ public class PopupClaimCommand {
             String text
     ) {
         Optional<Claim> optionalClaim =
-                ClaimResolver.findByName(claimName);
+                findEditableClaim(source, claimName);
 
         if (optionalClaim.isEmpty()) {
-            source.sendFailure(
-                    Component.literal(
-                            "No claim found named \""
-                                    + claimName
-                                    + "\"."
-                    )
-            );
-
             return 0;
         }
 
@@ -370,17 +404,9 @@ public class PopupClaimCommand {
             String text
     ) {
         Optional<Claim> optionalClaim =
-                ClaimResolver.findByName(claimName);
+                findEditableClaim(source, claimName);
 
         if (optionalClaim.isEmpty()) {
-            source.sendFailure(
-                    Component.literal(
-                            "No claim found named \""
-                                    + claimName
-                                    + "\"."
-                    )
-            );
-
             return 0;
         }
 
@@ -407,17 +433,9 @@ public class PopupClaimCommand {
             String text
     ) {
         Optional<Claim> optionalClaim =
-                ClaimResolver.findByName(claimName);
+                findEditableClaim(source, claimName);
 
         if (optionalClaim.isEmpty()) {
-            source.sendFailure(
-                    Component.literal(
-                            "No claim found named \""
-                                    + claimName
-                                    + "\"."
-                    )
-            );
-
             return 0;
         }
 
@@ -444,17 +462,9 @@ public class PopupClaimCommand {
             String text
     ) {
         Optional<Claim> optionalClaim =
-                ClaimResolver.findByName(claimName);
+                findEditableClaim(source, claimName);
 
         if (optionalClaim.isEmpty()) {
-            source.sendFailure(
-                    Component.literal(
-                            "No claim found named \""
-                                    + claimName
-                                    + "\"."
-                    )
-            );
-
             return 0;
         }
 
@@ -481,17 +491,9 @@ public class PopupClaimCommand {
             String sound
     ) {
         Optional<Claim> optionalClaim =
-                ClaimResolver.findByName(claimName);
+                findEditableClaim(source, claimName);
 
         if (optionalClaim.isEmpty()) {
-            source.sendFailure(
-                    Component.literal(
-                            "No claim found named \""
-                                    + claimName
-                                    + "\"."
-                    )
-            );
-
             return 0;
         }
 
@@ -530,17 +532,9 @@ public class PopupClaimCommand {
             String sound
     ) {
         Optional<Claim> optionalClaim =
-                ClaimResolver.findByName(claimName);
+                findEditableClaim(source, claimName);
 
         if (optionalClaim.isEmpty()) {
-            source.sendFailure(
-                    Component.literal(
-                            "No claim found named \""
-                                    + claimName
-                                    + "\"."
-                    )
-            );
-
             return 0;
         }
 

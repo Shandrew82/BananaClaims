@@ -20,7 +20,7 @@ public class DescriptionClaimCommand {
                                         "input",
                                         StringArgumentType.greedyString()
                                 )
-                                .suggests(ClaimSuggestions.OWNED_CLAIMS)
+                                .suggests(ClaimSuggestions.MANAGED_CLAIMS)
                                 .executes(context -> updateDescription(
                                         context.getSource(),
                                         StringArgumentType.getString(
@@ -61,7 +61,7 @@ public class DescriptionClaimCommand {
                     trimmedInput.substring(firstSpace + 1).trim();
 
             Optional<Claim> namedClaim =
-                    ClaimResolver.findOwnedByName(
+                    ClaimResolver.findManagedByName(
                             player.getUUID(),
                             possibleClaimName
                     );
@@ -93,10 +93,10 @@ public class DescriptionClaimCommand {
 
         Claim claim = currentClaim.get();
 
-        if (!claim.isOwner(player.getUUID())) {
+        if (!claim.canManage(player.getUUID())) {
             source.sendFailure(
                     Component.literal(
-                            "You do not own this claim."
+                            "You cannot manage this claim."
                     )
             );
 

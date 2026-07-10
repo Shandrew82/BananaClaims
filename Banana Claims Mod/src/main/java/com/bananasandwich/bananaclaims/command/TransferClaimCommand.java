@@ -136,7 +136,7 @@ public final class TransferClaimCommand {
 
         Claim claim = optionalClaim.get();
 
-        if (!claim.isOwner(currentOwner.getUUID())) {
+        if (!claim.canTransfer(currentOwner.getUUID())) {
             source.sendFailure(
                     Component.literal(
                             "You do not own this claim."

@@ -21,7 +21,7 @@ public class ShrinkClaimCommand {
                                         "claim",
                                         StringArgumentType.word()
                                 )
-                                .suggests(ClaimSuggestions.OWNED_CLAIMS)
+                                .suggests(ClaimSuggestions.MANAGED_CLAIMS)
                                 .executes(context -> shrinkClaim(
                                         context.getSource(),
                                         StringArgumentType.getString(
@@ -39,7 +39,7 @@ public class ShrinkClaimCommand {
         ServerPlayer player = source.getPlayerOrException();
 
         Optional<Claim> optionalClaim =
-                ClaimResolver.findOwnedByName(
+                ClaimResolver.findManagedByName(
                         player.getUUID(),
                         claimName
                 );
@@ -47,7 +47,7 @@ public class ShrinkClaimCommand {
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
                     Component.literal(
-                            "You do not own a claim named \""
+                            "You cannot manage a claim named \""
                                     + claimName
                                     + "\"."
                     )
@@ -57,6 +57,16 @@ public class ShrinkClaimCommand {
         }
 
         Claim claim = optionalClaim.get();
+
+        if (!claim.canResize(player.getUUID())) {
+            source.sendFailure(
+                    Component.literal(
+                            "You cannot resize this claim."
+                    )
+            );
+
+            return 0;
+        }
 
         ChunkPos chunkPosition = player.chunkPosition();
         String dimension = player.level().dimension().toString();

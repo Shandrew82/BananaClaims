@@ -21,7 +21,7 @@ public class ExpandClaimCommand {
                                         "claim",
                                         StringArgumentType.word()
                                 )
-                                .suggests(ClaimSuggestions.OWNED_CLAIMS)
+                                .suggests(ClaimSuggestions.MANAGED_CLAIMS)
                                 .executes(context -> expandClaim(
                                         context.getSource(),
                                         StringArgumentType.getString(
@@ -56,7 +56,7 @@ public class ExpandClaimCommand {
         }
 
         Optional<Claim> optionalClaim =
-                ClaimResolver.findOwnedByName(
+                ClaimResolver.findManagedByName(
                         player.getUUID(),
                         claimName
                 );
@@ -64,7 +64,7 @@ public class ExpandClaimCommand {
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
                     Component.literal(
-                            "You do not own a claim named \""
+                            "You cannot manage a claim named \""
                                     + claimName
                                     + "\"."
                     )
@@ -74,6 +74,16 @@ public class ExpandClaimCommand {
         }
 
         Claim claim = optionalClaim.get();
+
+        if (!claim.canResize(player.getUUID())) {
+            source.sendFailure(
+                    Component.literal(
+                            "You cannot resize this claim."
+                    )
+            );
+
+            return 0;
+        }
 
         claim.addChunk(
                 dimension,

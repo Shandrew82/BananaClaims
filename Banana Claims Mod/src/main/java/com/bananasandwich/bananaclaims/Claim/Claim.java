@@ -247,8 +247,40 @@ public class Claim {
         return getMember(playerUuid).isPresent();
     }
 
-    public boolean hasAccess(UUID playerUuid) {
+    public boolean canAccess(UUID playerUuid) {
         return isOwner(playerUuid) || isMember(playerUuid);
+    }
+
+    public boolean hasAccess(UUID playerUuid) {
+        return canAccess(playerUuid);
+    }
+
+    public boolean canManage(UUID playerUuid) {
+        return isOwner(playerUuid);
+    }
+
+    public boolean canResize(UUID playerUuid) {
+        return canManage(playerUuid);
+    }
+
+    public boolean canEditMembers(UUID playerUuid) {
+        return canManage(playerUuid);
+    }
+
+    public boolean canEditFlags(UUID playerUuid) {
+        return canManage(playerUuid);
+    }
+
+    public boolean canEditPopup(UUID playerUuid) {
+        return canManage(playerUuid);
+    }
+
+    public boolean canTransfer(UUID playerUuid) {
+        return isOwner(playerUuid);
+    }
+
+    public boolean canDelete(UUID playerUuid) {
+        return isOwner(playerUuid);
     }
 
     public ClaimFlags getFlags() {

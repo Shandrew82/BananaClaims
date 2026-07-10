@@ -48,6 +48,27 @@ public final class ClaimResolver {
                 .findFirst();
     }
 
+    public static Optional<Claim> findManagedByName(
+            UUID playerUuid,
+            String claimName
+    ) {
+        if (playerUuid == null
+                || claimName == null
+                || claimName.isBlank()) {
+            return Optional.empty();
+        }
+
+        return Bananaclaims.CLAIM_MANAGER
+                .getAllClaims()
+                .stream()
+                .filter(claim ->
+                        claim.canManage(playerUuid)
+                                && claim.getName() != null
+                                && claim.getName().equalsIgnoreCase(claimName)
+                )
+                .findFirst();
+    }
+
     public static Optional<Claim> findAtPlayer(
             ServerPlayer player
     ) {

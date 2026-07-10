@@ -83,10 +83,10 @@ public final class AddMemberCommand {
 
         Claim claim = optionalClaim.get();
 
-        if (!claim.isOwner(owner.getUUID())) {
+        if (!claim.canEditMembers(owner.getUUID())) {
             source.sendFailure(
                     Component.literal(
-                            "You do not own this claim."
+                            "You cannot edit members for this claim."
                     )
             );
 
@@ -109,7 +109,7 @@ public final class AddMemberCommand {
                 source.getPlayerOrException();
 
         Optional<Claim> optionalClaim =
-                ClaimResolver.findOwnedByName(
+                ClaimResolver.findManagedByName(
                         owner.getUUID(),
                         claimName
                 );
@@ -117,7 +117,7 @@ public final class AddMemberCommand {
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
                     Component.literal(
-                            "You do not own a claim named \""
+                            "You cannot manage a claim named \""
                                     + claimName
                                     + "\"."
                     )
@@ -126,9 +126,21 @@ public final class AddMemberCommand {
             return 0;
         }
 
+        Claim claim = optionalClaim.get();
+
+        if (!claim.canEditMembers(owner.getUUID())) {
+            source.sendFailure(
+                    Component.literal(
+                            "You cannot edit members for this claim."
+                    )
+            );
+
+            return 0;
+        }
+
         return addMember(
                 source,
-                optionalClaim.get(),
+                claim,
                 playerName
         );
     }

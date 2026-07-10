@@ -21,7 +21,7 @@ public class RenameClaimCommand {
                                         StringArgumentType.word()
                                 )
                                 .suggests(
-                                        ClaimSuggestions.OWNED_CLAIMS
+                                        ClaimSuggestions.MANAGED_CLAIMS
                                 )
                                 .executes(context ->
                                         renameCurrentClaim(
@@ -75,10 +75,10 @@ public class RenameClaimCommand {
 
         Claim claim = optionalClaim.get();
 
-        if (!claim.isOwner(player.getUUID())) {
+        if (!claim.canManage(player.getUUID())) {
             source.sendFailure(
                     Component.literal(
-                            "You do not own this claim."
+                            "You cannot manage this claim."
                     )
             );
 
@@ -101,7 +101,7 @@ public class RenameClaimCommand {
                 source.getPlayerOrException();
 
         Optional<Claim> optionalClaim =
-                ClaimResolver.findOwnedByName(
+                ClaimResolver.findManagedByName(
                         player.getUUID(),
                         claimName
                 );
@@ -109,7 +109,7 @@ public class RenameClaimCommand {
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
                     Component.literal(
-                            "You do not own a claim named \""
+                            "You cannot manage a claim named \""
                                     + claimName
                                     + "\"."
                     )

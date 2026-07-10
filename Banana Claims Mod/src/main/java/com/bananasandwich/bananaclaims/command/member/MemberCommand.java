@@ -35,7 +35,7 @@ public final class MemberCommand {
                                         StringArgumentType.word()
                                 )
                                 .suggests(
-                                        ClaimSuggestions.OWNED_CLAIMS
+                                        ClaimSuggestions.MANAGED_CLAIMS
                                 )
 
                                 .then(Commands.literal("add")
