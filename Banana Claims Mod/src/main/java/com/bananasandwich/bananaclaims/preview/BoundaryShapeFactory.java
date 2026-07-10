@@ -17,7 +17,8 @@ public final class BoundaryShapeFactory {
     }
 
     public static BoundaryPreview fromSelection(
-            ClaimSelection selection
+            ClaimSelection selection,
+            int maximumBuildHeight
     ) {
         if (selection == null
                 || !selection.hasBothPositions()
@@ -35,17 +36,16 @@ public final class BoundaryShapeFactory {
                 Math.max(pos1.getX(), pos2.getX())
                         + 1.0D;
 
+        /*
+         * The lower selected Y-level remains the floor. The preview now
+         * reaches the dimension's build ceiling, matching claim previews.
+         */
         double minY =
                 Math.min(pos1.getY(), pos2.getY());
 
-        double selectedMaxY =
-                Math.max(pos1.getY(), pos2.getY())
-                        + 1.0D;
-
         double maxY = Math.max(
-                selectedMaxY,
-                minY
-                        + PreviewSettings.DEFAULT_SELECTION_HEIGHT
+                minY + 1.0D,
+                maximumBuildHeight
         );
 
         double minZ =
@@ -73,6 +73,26 @@ public final class BoundaryShapeFactory {
                         maxY,
                         maxZ
                 )
+        );
+    }
+
+    public static BoundaryPreview fromSelection(
+            ClaimSelection selection
+    ) {
+        if (selection == null
+                || !selection.hasBothPositions()) {
+            return null;
+        }
+
+        int selectedMaximumY =
+                Math.max(
+                        selection.getPos1().getY(),
+                        selection.getPos2().getY()
+                ) + 1;
+
+        return fromSelection(
+                selection,
+                selectedMaximumY
         );
     }
 
@@ -151,11 +171,6 @@ public final class BoundaryShapeFactory {
             );
         }
 
-        /*
-         * Each claimed chunk contributes one top and one bottom face.
-         * Internal shared edges are not drawn, but the full claimed area
-         * receives the soft particle shading.
-         */
         for (ClaimChunk chunk : claim.getChunks()) {
             double minX =
                     chunk.getChunkX() * 16.0D;
@@ -266,9 +281,6 @@ public final class BoundaryShapeFactory {
         double sizeZ = maxZ - minZ;
 
         return List.of(
-                /*
-                 * Bottom and top.
-                 */
                 new BoundarySurface(
                         minX,
                         minY,
@@ -291,10 +303,6 @@ public final class BoundaryShapeFactory {
                         0.0D,
                         sizeZ
                 ),
-
-                /*
-                 * North and south walls.
-                 */
                 new BoundarySurface(
                         minX,
                         minY,
@@ -317,10 +325,6 @@ public final class BoundaryShapeFactory {
                         sizeY,
                         0.0D
                 ),
-
-                /*
-                 * West and east walls.
-                 */
                 new BoundarySurface(
                         minX,
                         minY,
@@ -458,5 +462,6 @@ public final class BoundaryShapeFactory {
     ) {
     }
 }
+
 
 

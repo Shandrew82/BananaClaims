@@ -34,10 +34,19 @@ public record BoundaryPreview(
                 .sum();
     }
 
-    public double totalSurfaceArea() {
+    public double totalVerticalSurfaceArea() {
         return surfaces.stream()
+                .filter(BoundarySurface::isVertical)
+                .mapToDouble(BoundarySurface::area)
+                .sum();
+    }
+
+    public double totalHorizontalSurfaceArea() {
+        return surfaces.stream()
+                .filter(BoundarySurface::isHorizontal)
                 .mapToDouble(BoundarySurface::area)
                 .sum();
     }
 }
+
 

@@ -115,7 +115,8 @@ public class SelectionClaimCommand {
 
         BoundaryPreview preview =
                 BoundaryShapeFactory.fromSelection(
-                        selection
+                        selection,
+                        player.level().getMaxY()
                 );
 
         if (preview == null) {
@@ -129,9 +130,10 @@ public class SelectionClaimCommand {
 
         source.sendSuccess(
                 () -> Component.literal(
-                        "Showing the full 3D selection boundary for 20 seconds."
+                        "Showing the full-height 3D selection boundary for 20 seconds."
                 ),
                 false
         );
     }
 }
+

@@ -46,5 +46,14 @@ public record BoundarySurface(
                         + crossZ * crossZ
         );
     }
+
+    public boolean isVertical() {
+        return Math.abs(axisUY) > 0.0001D
+                || Math.abs(axisVY) > 0.0001D;
+    }
+
+    public boolean isHorizontal() {
+        return !isVertical();
+    }
 }
 

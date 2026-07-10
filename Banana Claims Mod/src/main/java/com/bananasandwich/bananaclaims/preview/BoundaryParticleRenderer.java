@@ -102,18 +102,36 @@ public final class BoundaryParticleRenderer {
             return;
         }
 
-        double spacing =
-                PreviewSettings.calculateShadeSpacing(
-                        preview.totalSurfaceArea()
+        double sideSpacing =
+                PreviewSettings.calculateSideShadeSpacing(
+                        preview.totalVerticalSurfaceArea()
+                );
+
+        double horizontalSpacing =
+                PreviewSettings.calculateHorizontalShadeSpacing(
+                        preview.totalHorizontalSurfaceArea()
                 );
 
         for (BoundarySurface surface : preview.surfaces()) {
-            renderSurface(
-                    level,
-                    player,
-                    surface,
-                    spacing
-            );
+            if (surface.isVertical()) {
+                renderSurface(
+                        level,
+                        player,
+                        surface,
+                        sideSpacing,
+                        PreviewSettings.SIDE_SHADE_PARTICLE_COUNT,
+                        PreviewSettings.SIDE_SHADE_PARTICLE_SPREAD
+                );
+            } else {
+                renderSurface(
+                        level,
+                        player,
+                        surface,
+                        horizontalSpacing,
+                        PreviewSettings.HORIZONTAL_SHADE_PARTICLE_COUNT,
+                        PreviewSettings.HORIZONTAL_SHADE_PARTICLE_SPREAD
+                );
+            }
         }
     }
 
@@ -121,7 +139,9 @@ public final class BoundaryParticleRenderer {
             ServerLevel level,
             ServerPlayer player,
             BoundarySurface surface,
-            double spacing
+            double spacing,
+            int particleCount,
+            double particleSpread
     ) {
         double width = surface.width();
         double height = surface.height();
@@ -140,10 +160,6 @@ public final class BoundaryParticleRenderer {
                 (int) Math.ceil(height / spacing)
         );
 
-        /*
-         * Start one step inward so the brighter edge renderer remains
-         * visually distinct from the shaded face.
-         */
         for (int u = 1; u < stepsU; u++) {
             double progressU =
                     (double) u / stepsU;
@@ -167,19 +183,15 @@ public final class BoundaryParticleRenderer {
                                 + surface.axisUZ() * progressU
                                 + surface.axisVZ() * progressV;
 
-                level.sendParticles(
+                sendLongDistanceParticles(
+                        level,
                         player,
                         SHADE_PARTICLE,
-                        false,
-                        false,
                         x,
                         y,
                         z,
-                        PreviewSettings.SHADE_PARTICLE_COUNT,
-                        PreviewSettings.SHADE_PARTICLE_SPREAD,
-                        PreviewSettings.SHADE_PARTICLE_SPREAD,
-                        PreviewSettings.SHADE_PARTICLE_SPREAD,
-                        0.0D
+                        particleCount,
+                        particleSpread
                 );
             }
         }
@@ -220,19 +232,15 @@ public final class BoundaryParticleRenderer {
                     progress
             );
 
-            level.sendParticles(
+            sendLongDistanceParticles(
+                    level,
                     player,
                     LINE_PARTICLE,
-                    false,
-                    false,
                     x,
                     y,
                     z,
                     PreviewSettings.LINE_PARTICLE_COUNT,
-                    PreviewSettings.LINE_PARTICLE_SPREAD,
-                    PreviewSettings.LINE_PARTICLE_SPREAD,
-                    PreviewSettings.LINE_PARTICLE_SPREAD,
-                    0.0D
+                    PreviewSettings.LINE_PARTICLE_SPREAD
             );
         }
     }
@@ -242,18 +250,44 @@ public final class BoundaryParticleRenderer {
             ServerPlayer player,
             PreviewPoint corner
     ) {
-        level.sendParticles(
+        sendLongDistanceParticles(
+                level,
                 player,
                 CORNER_PARTICLE,
-                false,
-                false,
                 corner.x(),
                 corner.y(),
                 corner.z(),
                 PreviewSettings.CORNER_PARTICLE_COUNT,
-                PreviewSettings.CORNER_PARTICLE_SPREAD,
-                PreviewSettings.CORNER_PARTICLE_SPREAD,
-                PreviewSettings.CORNER_PARTICLE_SPREAD,
+                PreviewSettings.CORNER_PARTICLE_SPREAD
+        );
+    }
+
+    private static void sendLongDistanceParticles(
+            ServerLevel level,
+            ServerPlayer player,
+            DustParticleOptions particle,
+            double x,
+            double y,
+            double z,
+            int count,
+            double spread
+    ) {
+        /*
+         * Both flags are enabled so Minecraft treats these preview
+         * particles as forced/long-distance particles for the target player.
+         */
+        level.sendParticles(
+                player,
+                particle,
+                true,
+                true,
+                x,
+                y,
+                z,
+                count,
+                spread,
+                spread,
+                spread,
                 0.0D
         );
     }
@@ -274,4 +308,5 @@ public final class BoundaryParticleRenderer {
     ) {
     }
 }
+
 
