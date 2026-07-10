@@ -27,11 +27,14 @@ public final class BoundaryPreviewManager {
             ServerPlayer player,
             BoundaryPreview preview
     ) {
-        if (player == null || preview == null || preview.lines().isEmpty()) {
+        if (player == null
+                || preview == null
+                || preview.lines().isEmpty()) {
             return;
         }
 
-        MinecraftServer server = player.level().getServer();
+        MinecraftServer server =
+                player.level().getServer();
 
         if (server == null) {
             return;
@@ -39,18 +42,24 @@ public final class BoundaryPreviewManager {
 
         long currentTick = server.getTickCount();
 
-        sessions.put(
-                player.getUUID(),
+        PreviewSession session =
                 new PreviewSession(
                         preview,
-                        currentTick + PreviewSettings.DURATION_TICKS,
+                        currentTick,
                         currentTick
-                )
+                                + PreviewSettings.DURATION_TICKS,
+                        currentTick + 1
+                );
+
+        sessions.put(
+                player.getUUID(),
+                session
         );
 
         BoundaryParticleRenderer.render(
                 player,
-                preview
+                preview,
+                0
         );
     }
 
@@ -73,20 +82,25 @@ public final class BoundaryPreviewManager {
         }
 
         long currentTick = server.getTickCount();
+
         Iterator<Map.Entry<UUID, PreviewSession>> iterator =
                 sessions.entrySet().iterator();
 
         while (iterator.hasNext()) {
-            Map.Entry<UUID, PreviewSession> entry = iterator.next();
-            PreviewSession session = entry.getValue();
+            Map.Entry<UUID, PreviewSession> entry =
+                    iterator.next();
+
+            PreviewSession session =
+                    entry.getValue();
 
             if (currentTick >= session.expiryTick()) {
                 iterator.remove();
                 continue;
             }
 
-            ServerPlayer player = server.getPlayerList()
-                    .getPlayer(entry.getKey());
+            ServerPlayer player =
+                    server.getPlayerList()
+                            .getPlayer(entry.getKey());
 
             if (player == null) {
                 iterator.remove();
@@ -105,17 +119,27 @@ public final class BoundaryPreviewManager {
                 continue;
             }
 
+            long elapsedTicks =
+                    currentTick - session.startTick();
+
             BoundaryParticleRenderer.render(
                     player,
-                    session.preview()
+                    session.preview(),
+                    elapsedTicks
             );
+
+            int nextInterval =
+                    elapsedTicks
+                            < PreviewSettings.MATERIALIZATION_TICKS
+                            ? 2
+                            : PreviewSettings.REFRESH_INTERVAL_TICKS;
 
             entry.setValue(
                     new PreviewSession(
                             session.preview(),
+                            session.startTick(),
                             session.expiryTick(),
-                            currentTick
-                                    + PreviewSettings.REFRESH_INTERVAL_TICKS
+                            currentTick + nextInterval
                     )
             );
         }
@@ -123,8 +147,10 @@ public final class BoundaryPreviewManager {
 
     private record PreviewSession(
             BoundaryPreview preview,
+            long startTick,
             long expiryTick,
             long nextRenderTick
     ) {
     }
 }
+
