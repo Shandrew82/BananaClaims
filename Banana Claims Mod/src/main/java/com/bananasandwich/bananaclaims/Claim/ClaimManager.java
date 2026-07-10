@@ -131,6 +131,37 @@ public class ClaimManager {
         return removed;
     }
 
+    public boolean transferOwnership(
+            Claim claim,
+            UUID newOwnerUuid,
+            String newOwnerName
+    ) {
+        if (claim == null
+                || newOwnerUuid == null
+                || !claimIdLookup.containsKey(claim.getClaimId())) {
+            return false;
+        }
+
+        boolean transferred = claim.transferOwnership(
+                newOwnerUuid,
+                newOwnerName
+        );
+
+        if (!transferred) {
+            return false;
+        }
+
+        revision++;
+        save();
+
+        publishChange(
+                ClaimChangeType.OWNERSHIP_TRANSFERRED,
+                claim
+        );
+
+        return true;
+    }
+
     public void saveClaims() {
         rebuildLookups();
         save();

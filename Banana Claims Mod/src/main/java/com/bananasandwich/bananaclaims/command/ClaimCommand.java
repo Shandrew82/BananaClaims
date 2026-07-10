@@ -36,6 +36,7 @@ public class ClaimCommand {
                         .then(RenameClaimCommand.register())
                         .then(DescriptionClaimCommand.register())
                         .then(MemberCommand.register())
+                        .then(TransferClaimCommand.register())
                         .then(FlagClaimCommand.register())
                         .then(PopupClaimCommand.register())
         );

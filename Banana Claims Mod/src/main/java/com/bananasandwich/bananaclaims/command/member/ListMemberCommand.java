@@ -8,6 +8,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -70,43 +71,37 @@ public final class ListMemberCommand {
             CommandSourceStack source,
             Claim claim
     ) {
-        List<String> memberNames =
-                claim.getMembers()
-                        .stream()
-                        .map(ClaimMember::getName)
-                        .filter(name ->
-                                name != null
-                                        && !name.isBlank()
-                        )
-                        .sorted(String.CASE_INSENSITIVE_ORDER)
-                        .toList();
+        List<String> people = new ArrayList<>();
 
-        if (memberNames.isEmpty()) {
-            source.sendSuccess(
-                    () -> Component.literal(
-                            "Claim \""
-                                    + claim.getName()
-                                    + "\" has no members."
-                    ),
-                    false
-            );
+        String ownerName = claim.getOwnerName();
 
-            return 1;
+        if (!ownerName.isBlank()) {
+            people.add(ownerName + " (Owner)");
         }
 
-        String memberList = String.join(
+        claim.getMembers()
+                .stream()
+                .map(ClaimMember::getName)
+                .filter(name ->
+                        name != null
+                                && !name.isBlank()
+                )
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .forEach(people::add);
+
+        String peopleList = String.join(
                 "\n- ",
-                memberNames
+                people
         );
 
         source.sendSuccess(
                 () -> Component.literal(
-                        "Members of claim \""
+                        "People in claim \""
                                 + claim.getName()
                                 + "\" ("
-                                + memberNames.size()
+                                + people.size()
                                 + "):\n- "
-                                + memberList
+                                + peopleList
                 ),
                 false
         );

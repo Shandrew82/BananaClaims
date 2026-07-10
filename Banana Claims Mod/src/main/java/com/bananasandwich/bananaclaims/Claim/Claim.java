@@ -88,6 +88,32 @@ public class Claim {
         return ownerName == null ? "" : ownerName;
     }
 
+    public boolean transferOwnership(
+            UUID newOwnerUuid,
+            String newOwnerName
+    ) {
+        if (newOwnerUuid == null || newOwnerUuid.equals(ownerUuid)) {
+            return false;
+        }
+
+        UUID previousOwnerUuid = ownerUuid;
+        String previousOwnerName = getOwnerName();
+
+        removeMember(newOwnerUuid);
+
+        ownerUuid = newOwnerUuid;
+        ownerName = newOwnerName == null ? "" : newOwnerName;
+
+        if (previousOwnerUuid != null) {
+            addMember(
+                    previousOwnerUuid,
+                    previousOwnerName
+            );
+        }
+
+        return true;
+    }
+
     public String getDimension() {
         return dimension;
     }
