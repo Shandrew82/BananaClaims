@@ -1,5 +1,6 @@
 package com.bananasandwich.bananaclaims.command;
 
+import com.bananasandwich.bananaclaims.command.member.MemberCommand;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -7,14 +8,19 @@ import net.minecraft.network.chat.Component;
 
 public class ClaimCommand {
 
-    public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
+    public static void register(
+            CommandDispatcher<CommandSourceStack> dispatcher
+    ) {
         dispatcher.register(
                 Commands.literal("claim")
                         .executes(context -> {
                             context.getSource().sendSuccess(
-                                    () -> Component.literal("Banana Claims is loaded."),
+                                    () -> Component.literal(
+                                            "Banana Claims is loaded."
+                                    ),
                                     false
                             );
+
                             return 1;
                         })
 
@@ -29,6 +35,7 @@ public class ClaimCommand {
                         .then(ListClaimCommand.register())
                         .then(RenameClaimCommand.register())
                         .then(DescriptionClaimCommand.register())
+                        .then(MemberCommand.register())
                         .then(FlagClaimCommand.register())
                         .then(PopupClaimCommand.register())
         );

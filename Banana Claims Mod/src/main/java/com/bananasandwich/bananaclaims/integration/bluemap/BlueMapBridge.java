@@ -3,6 +3,7 @@ package com.bananasandwich.bananaclaims.integration.bluemap;
 import com.bananasandwich.bananaclaims.Bananaclaims;
 import com.bananasandwich.bananaclaims.claim.Claim;
 import com.bananasandwich.bananaclaims.claim.ClaimChunk;
+import com.bananasandwich.bananaclaims.claim.ClaimMember;
 import com.bananasandwich.bananaclaims.claim.event.ClaimChangeEvent;
 import com.bananasandwich.bananaclaims.claim.event.ClaimChangeListener;
 import com.flowpowered.math.vector.Vector2d;
@@ -106,7 +107,9 @@ public final class BlueMapBridge {
         );
     }
 
-    private static void handleClaimChange(ClaimChangeEvent event) {
+    private static void handleClaimChange(
+            ClaimChangeEvent event
+    ) {
         if (activeApi == null || event == null) {
             return;
         }
@@ -131,6 +134,7 @@ public final class BlueMapBridge {
             activeClaimIds.add(claimId);
 
             int fingerprint = createFingerprint(claim);
+
             Integer previousFingerprint =
                     CLAIM_FINGERPRINTS.get(claimId);
 
@@ -179,6 +183,7 @@ public final class BlueMapBridge {
                     "Could not create a BlueMap outline for claim \"{}\".",
                     claim.getName()
             );
+
             return;
         }
 
@@ -191,10 +196,12 @@ public final class BlueMapBridge {
         );
 
         marker.setLineWidth(2);
+
         marker.setColors(
                 BORDER_COLOR,
                 FILL_COLOR
         );
+
         marker.setDepthTestEnabled(false);
         marker.setListed(true);
         marker.setDetail(createDetail(claim));
@@ -312,15 +319,16 @@ public final class BlueMapBridge {
             return List.of();
         }
 
-        List<Point> outerLoop = loops.stream()
-                .max(
-                        Comparator.comparingDouble(
-                                loop -> Math.abs(
-                                        calculateSignedArea(loop)
+        List<Point> outerLoop =
+                loops.stream()
+                        .max(
+                                Comparator.comparingDouble(
+                                        loop -> Math.abs(
+                                                calculateSignedArea(loop)
+                                        )
                                 )
                         )
-                )
-                .orElse(List.of());
+                        .orElse(List.of());
 
         return simplifyLoop(outerLoop)
                 .stream()
@@ -372,7 +380,8 @@ public final class BlueMapBridge {
             Edge current = first;
             Point startingPoint = first.start;
 
-            while (current != null && unused.remove(current)) {
+            while (current != null
+                    && unused.remove(current)) {
                 loop.add(current.start);
 
                 Point nextPoint = current.end;
@@ -420,18 +429,21 @@ public final class BlueMapBridge {
 
         List<Point> simplified = new ArrayList<>();
 
-        for (int index = 0; index < loop.size(); index++) {
-            Point previous =
-                    loop.get(
-                            Math.floorMod(index - 1, loop.size())
-                    );
+        for (int index = 0;
+             index < loop.size();
+             index++) {
+            Point previous = loop.get(
+                    Math.floorMod(
+                            index - 1,
+                            loop.size()
+                    )
+            );
 
             Point current = loop.get(index);
 
-            Point next =
-                    loop.get(
-                            (index + 1) % loop.size()
-                    );
+            Point next = loop.get(
+                    (index + 1) % loop.size()
+            );
 
             boolean sameX =
                     previous.x == current.x
@@ -454,12 +466,14 @@ public final class BlueMapBridge {
     ) {
         double area = 0.0D;
 
-        for (int index = 0; index < loop.size(); index++) {
+        for (int index = 0;
+             index < loop.size();
+             index++) {
             Point current = loop.get(index);
-            Point next =
-                    loop.get(
-                            (index + 1) % loop.size()
-                    );
+
+            Point next = loop.get(
+                    (index + 1) % loop.size()
+            );
 
             area +=
                     (double) current.x * next.z
@@ -516,7 +530,32 @@ public final class BlueMapBridge {
         return normalized;
     }
 
-    private static String createDetail(Claim claim) {
+    private static String createDetail(
+            Claim claim
+    ) {
+        List<String> memberNames =
+                getSortedMemberNames(claim);
+
+        String membersHtml;
+
+        if (memberNames.isEmpty()) {
+            membersHtml = "None";
+        } else {
+            membersHtml = memberNames.stream()
+                    .map(BlueMapBridge::escapeHtml)
+                    .map(name -> "&#8226; " + name)
+                    .reduce(
+                            (first, second) ->
+                                    first + "<br>" + second
+                    )
+                    .orElse("None");
+        }
+
+        String description =
+                claim.getDescription().isBlank()
+                        ? "No description."
+                        : claim.getDescription();
+
         return "<div>"
                 + "<strong>"
                 + escapeHtml(claim.getName())
@@ -524,15 +563,36 @@ public final class BlueMapBridge {
                 + "Owner: "
                 + escapeHtml(claim.getOwnerName())
                 + "<br>"
+                + "Members ("
+                + memberNames.size()
+                + "):<br>"
+                + membersHtml
+                + "<br>"
                 + "Chunks: "
                 + claim.getChunks().size()
                 + "<br>"
                 + "Description: "
-                + escapeHtml(claim.getDescription())
+                + escapeHtml(description)
                 + "</div>";
     }
 
-    private static String escapeHtml(String text) {
+    private static List<String> getSortedMemberNames(
+            Claim claim
+    ) {
+        return claim.getMembers()
+                .stream()
+                .map(ClaimMember::getName)
+                .filter(name ->
+                        name != null
+                                && !name.isBlank()
+                )
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .toList();
+    }
+
+    private static String escapeHtml(
+            String text
+    ) {
         if (text == null) {
             return "";
         }
@@ -545,15 +605,30 @@ public final class BlueMapBridge {
                 .replace("'", "&#39;");
     }
 
-    private static String createMarkerId(UUID claimId) {
+    private static String createMarkerId(
+            UUID claimId
+    ) {
         return "claim-" + claimId;
     }
 
-    private static int createFingerprint(Claim claim) {
+    private static int createFingerprint(
+            Claim claim
+    ) {
         List<String> sortedChunks =
                 claim.getChunks()
                         .stream()
                         .map(ClaimChunk::toString)
+                        .sorted()
+                        .toList();
+
+        List<String> sortedMembers =
+                claim.getMembers()
+                        .stream()
+                        .map(member ->
+                                member.getUuid()
+                                        + "|"
+                                        + member.getName()
+                        )
                         .sorted()
                         .toList();
 
@@ -563,13 +638,17 @@ public final class BlueMapBridge {
                 claim.getOwnerUuid(),
                 claim.getOwnerName(),
                 claim.getDescription(),
-                sortedChunks
+                sortedChunks,
+                sortedMembers
         );
     }
 
     private record Point(int x, int z) {
     }
 
-    private record Edge(Point start, Point end) {
+    private record Edge(
+            Point start,
+            Point end
+    ) {
     }
 }
