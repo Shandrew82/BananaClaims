@@ -41,6 +41,7 @@ public class ClaimManager {
         }
 
         claim.ensureClaimId();
+        claim.repairRoleInvariants();
 
         if (claimIdLookup.containsKey(claim.getClaimId())) {
             return false;
@@ -79,10 +80,8 @@ public class ClaimManager {
                     continue;
                 }
 
-                if (claim.ensureClaimId()) {
-                    migrated = true;
-                }
-
+                migrated |= claim.ensureClaimId();
+                migrated |= claim.repairRoleInvariants();
                 claims.add(claim);
             }
         }
@@ -131,38 +130,266 @@ public class ClaimManager {
         return removed;
     }
 
-    public boolean transferOwnership(
+    public ClaimMutationResult addMember(
             Claim claim,
+            UUID actorUuid,
+            UUID playerUuid,
+            String playerName
+    ) {
+        ClaimMutationResult validation = validateManagedMutation(
+                claim,
+                actorUuid,
+                playerUuid,
+                true
+        );
+
+        if (validation != ClaimMutationResult.NO_CHANGE) {
+            return validation;
+        }
+
+        return switch (claim.getRole(playerUuid)) {
+            case OWNER -> ClaimMutationResult.PLAYER_IS_OWNER;
+            case SUBOWNER -> ClaimMutationResult.PLAYER_IS_SUBOWNER;
+            case MEMBER -> ClaimMutationResult.PLAYER_IS_MEMBER;
+            case NONE -> {
+                if (!claim.addMember(playerUuid, playerName)) {
+                    yield ClaimMutationResult.NO_CHANGE;
+                }
+
+                commitMutation(
+                        ClaimChangeType.MEMBERSHIP_CHANGED,
+                        claim
+                );
+
+                yield ClaimMutationResult.MEMBER_ADDED;
+            }
+        };
+    }
+
+    public ClaimMutationResult removeMember(
+            Claim claim,
+            UUID actorUuid,
+            UUID playerUuid
+    ) {
+        ClaimMutationResult validation = validateManagedMutation(
+                claim,
+                actorUuid,
+                playerUuid,
+                true
+        );
+
+        if (validation != ClaimMutationResult.NO_CHANGE) {
+            return validation;
+        }
+
+        return switch (claim.getRole(playerUuid)) {
+            case OWNER -> ClaimMutationResult.PLAYER_IS_OWNER;
+            case SUBOWNER -> ClaimMutationResult.PLAYER_IS_SUBOWNER;
+            case NONE -> ClaimMutationResult.PLAYER_NOT_MEMBER;
+            case MEMBER -> {
+                if (!claim.removeMember(playerUuid)) {
+                    yield ClaimMutationResult.NO_CHANGE;
+                }
+
+                commitMutation(
+                        ClaimChangeType.MEMBERSHIP_CHANGED,
+                        claim
+                );
+
+                yield ClaimMutationResult.MEMBER_REMOVED;
+            }
+        };
+    }
+
+    public ClaimMutationResult addSubOwner(
+            Claim claim,
+            UUID actorUuid,
+            UUID playerUuid,
+            String playerName
+    ) {
+        ClaimMutationResult validation = validateManagedMutation(
+                claim,
+                actorUuid,
+                playerUuid,
+                false
+        );
+
+        if (validation != ClaimMutationResult.NO_CHANGE) {
+            return validation;
+        }
+
+        if (!claim.canEditSubOwners(actorUuid)) {
+            return ClaimMutationResult.NOT_AUTHORIZED;
+        }
+
+        ClaimRole previousRole = claim.getRole(playerUuid);
+
+        if (previousRole == ClaimRole.OWNER) {
+            return ClaimMutationResult.PLAYER_IS_OWNER;
+        }
+
+        if (previousRole == ClaimRole.SUBOWNER) {
+            return ClaimMutationResult.PLAYER_IS_SUBOWNER;
+        }
+
+        if (!claim.addSubOwner(playerUuid, playerName)) {
+            return ClaimMutationResult.NO_CHANGE;
+        }
+
+        commitMutation(
+                ClaimChangeType.SUBOWNER_CHANGED,
+                claim
+        );
+
+        return previousRole == ClaimRole.MEMBER
+                ? ClaimMutationResult.MEMBER_PROMOTED_TO_SUBOWNER
+                : ClaimMutationResult.SUBOWNER_ADDED;
+    }
+
+    public ClaimMutationResult demoteSubOwner(
+            Claim claim,
+            UUID actorUuid,
+            UUID playerUuid
+    ) {
+        ClaimMutationResult validation = validateManagedMutation(
+                claim,
+                actorUuid,
+                playerUuid,
+                false
+        );
+
+        if (validation != ClaimMutationResult.NO_CHANGE) {
+            return validation;
+        }
+
+        if (!claim.canEditSubOwners(actorUuid)) {
+            return ClaimMutationResult.NOT_AUTHORIZED;
+        }
+
+        ClaimRole targetRole = claim.getRole(playerUuid);
+
+        if (targetRole == ClaimRole.OWNER) {
+            return ClaimMutationResult.PLAYER_IS_OWNER;
+        }
+
+        if (targetRole != ClaimRole.SUBOWNER) {
+            return ClaimMutationResult.PLAYER_NOT_SUBOWNER;
+        }
+
+        if (!claim.demoteSubOwnerToMember(playerUuid)) {
+            return ClaimMutationResult.NO_CHANGE;
+        }
+
+        commitMutation(
+                ClaimChangeType.SUBOWNER_CHANGED,
+                claim
+        );
+
+        return ClaimMutationResult.SUBOWNER_DEMOTED_TO_MEMBER;
+    }
+
+    public ClaimMutationResult leaveClaim(
+            Claim claim,
+            UUID playerUuid
+    ) {
+        if (!isManagedClaim(claim)) {
+            return ClaimMutationResult.CLAIM_NOT_FOUND;
+        }
+
+        if (playerUuid == null) {
+            return ClaimMutationResult.INVALID_PLAYER;
+        }
+
+        return switch (claim.getRole(playerUuid)) {
+            case OWNER -> ClaimMutationResult.OWNER_CANNOT_LEAVE;
+            case NONE -> ClaimMutationResult.NOT_PARTICIPANT;
+            case MEMBER -> {
+                if (!claim.removeMember(playerUuid)) {
+                    yield ClaimMutationResult.NO_CHANGE;
+                }
+
+                commitMutation(
+                        ClaimChangeType.MEMBERSHIP_CHANGED,
+                        claim
+                );
+
+                yield ClaimMutationResult.MEMBER_LEFT;
+            }
+            case SUBOWNER -> {
+                if (!claim.demoteSubOwnerToMember(playerUuid)) {
+                    yield ClaimMutationResult.NO_CHANGE;
+                }
+
+                commitMutation(
+                        ClaimChangeType.SUBOWNER_CHANGED,
+                        claim
+                );
+
+                yield ClaimMutationResult.SUBOWNER_STEPPED_DOWN;
+            }
+        };
+    }
+
+    public ClaimMutationResult transferOwnership(
+            Claim claim,
+            UUID actorUuid,
             UUID newOwnerUuid,
             String newOwnerName
     ) {
-        if (claim == null
-                || newOwnerUuid == null
-                || !claimIdLookup.containsKey(claim.getClaimId())) {
-            return false;
+        if (!isManagedClaim(claim)) {
+            return ClaimMutationResult.CLAIM_NOT_FOUND;
         }
 
-        boolean transferred = claim.transferOwnership(
+        if (actorUuid == null || newOwnerUuid == null) {
+            return ClaimMutationResult.INVALID_PLAYER;
+        }
+
+        if (!claim.canTransfer(actorUuid)) {
+            return ClaimMutationResult.NOT_AUTHORIZED;
+        }
+
+        if (claim.isOwner(newOwnerUuid)) {
+            return ClaimMutationResult.SAME_OWNER;
+        }
+
+        boolean duplicateClaimName = claims.stream()
+                .filter(ownedClaim ->
+                        ownedClaim != claim
+                                && ownedClaim.isOwner(newOwnerUuid)
+                )
+                .map(Claim::getName)
+                .filter(ownedName ->
+                        ownedName != null
+                                && claim.getName() != null
+                )
+                .anyMatch(ownedName ->
+                        ownedName.equalsIgnoreCase(claim.getName())
+                );
+
+        if (duplicateClaimName) {
+            return ClaimMutationResult.DUPLICATE_OWNER_CLAIM_NAME;
+        }
+
+        if (!claim.transferOwnership(
                 newOwnerUuid,
                 newOwnerName
-        );
-
-        if (!transferred) {
-            return false;
+        )) {
+            return ClaimMutationResult.NO_CHANGE;
         }
 
-        revision++;
-        save();
-
-        publishChange(
+        commitMutation(
                 ClaimChangeType.OWNERSHIP_TRANSFERRED,
                 claim
         );
 
-        return true;
+        return ClaimMutationResult.OWNERSHIP_TRANSFERRED;
     }
 
     public void saveClaims() {
+        for (Claim claim : claims) {
+            claim.repairRoleInvariants();
+        }
+
         rebuildLookups();
         save();
 
@@ -229,12 +456,56 @@ public class ClaimManager {
         return revision;
     }
 
+    private ClaimMutationResult validateManagedMutation(
+            Claim claim,
+            UUID actorUuid,
+            UUID playerUuid,
+            boolean memberPermission
+    ) {
+        if (!isManagedClaim(claim)) {
+            return ClaimMutationResult.CLAIM_NOT_FOUND;
+        }
+
+        if (actorUuid == null || playerUuid == null) {
+            return ClaimMutationResult.INVALID_PLAYER;
+        }
+
+        if (memberPermission
+                && !claim.canEditMembers(actorUuid)) {
+            return ClaimMutationResult.NOT_AUTHORIZED;
+        }
+
+        return ClaimMutationResult.NO_CHANGE;
+    }
+
+    private boolean isManagedClaim(Claim claim) {
+        if (claim == null) {
+            return false;
+        }
+
+        UUID claimId = claim.getClaimId();
+        return claimId != null
+                && claimIdLookup.get(claimId) == claim;
+    }
+
+    private void commitMutation(
+            ClaimChangeType type,
+            Claim claim
+    ) {
+        claim.repairRoleInvariants();
+        revision++;
+        save();
+        publishChange(type, claim);
+    }
+
     private void rebuildLookups() {
         chunkLookup.clear();
         claimIdLookup.clear();
 
         for (Claim claim : claims) {
             claim.ensureClaimId();
+            claim.repairRoleInvariants();
+
             claimIdLookup.put(
                     claim.getClaimId(),
                     claim

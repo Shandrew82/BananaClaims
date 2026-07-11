@@ -39,7 +39,7 @@ public class Claim {
 
         this.name = name;
         this.ownerUuid = ownerUuid;
-        this.ownerName = ownerName;
+        this.ownerName = normalizePlayerName(ownerName);
         this.dimension = dimension;
         this.chunkX = chunkX;
         this.chunkZ = chunkZ;
@@ -74,6 +74,51 @@ public class Claim {
         return true;
     }
 
+    /**
+     * Repairs role conflicts that may exist in data produced by older builds.
+     * Owner, subowner, and member are mutually exclusive, with the highest
+     * authority role winning when duplicate records are encountered.
+     *
+     * @return true when stored data was changed
+     */
+    public boolean repairRoleInvariants() {
+        boolean changed = false;
+
+        if (ownerName == null) {
+            ownerName = "";
+            changed = true;
+        }
+
+        boolean membersWereNull = members == null;
+        boolean subOwnersWereNull = subOwners == null;
+        int previousMemberCount = membersWereNull ? 0 : members.size();
+        int previousSubOwnerCount = subOwnersWereNull ? 0 : subOwners.size();
+
+        ensureMembers();
+        ensureSubOwners();
+
+        changed |= membersWereNull || subOwnersWereNull;
+        changed |= previousMemberCount != members.size();
+        changed |= previousSubOwnerCount != subOwners.size();
+
+        if (ownerUuid != null) {
+            changed |= removeMember(ownerUuid);
+            changed |= removeSubOwner(ownerUuid);
+        }
+
+        Set<UUID> subOwnerUuids = new HashSet<>();
+
+        for (ClaimSubOwner subOwner : subOwners) {
+            subOwnerUuids.add(subOwner.getUuid());
+        }
+
+        changed |= members.removeIf(member ->
+                subOwnerUuids.contains(member.getUuid())
+        );
+
+        return changed;
+    }
+
     public String getName() {
         return name;
     }
@@ -87,14 +132,15 @@ public class Claim {
     }
 
     public String getOwnerName() {
-        return ownerName == null ? "" : ownerName;
+        return normalizePlayerName(ownerName);
     }
 
     public boolean transferOwnership(
             UUID newOwnerUuid,
             String newOwnerName
     ) {
-        if (newOwnerUuid == null || newOwnerUuid.equals(ownerUuid)) {
+        if (newOwnerUuid == null
+                || newOwnerUuid.equals(ownerUuid)) {
             return false;
         }
 
@@ -104,8 +150,13 @@ public class Claim {
         removeMember(newOwnerUuid);
         removeSubOwner(newOwnerUuid);
 
+        if (previousOwnerUuid != null) {
+            removeMember(previousOwnerUuid);
+            removeSubOwner(previousOwnerUuid);
+        }
+
         ownerUuid = newOwnerUuid;
-        ownerName = newOwnerName == null ? "" : newOwnerName;
+        ownerName = normalizePlayerName(newOwnerName);
 
         if (previousOwnerUuid != null) {
             addMember(
@@ -114,6 +165,7 @@ public class Claim {
             );
         }
 
+        repairRoleInvariants();
         return true;
     }
 
@@ -211,8 +263,13 @@ public class Claim {
                 .findFirst();
     }
 
-    public boolean addMember(UUID playerUuid, String playerName) {
-        if (playerUuid == null || isOwner(playerUuid) || isSubOwner(playerUuid)) {
+    public boolean addMember(
+            UUID playerUuid,
+            String playerName
+    ) {
+        if (playerUuid == null
+                || isOwner(playerUuid)
+                || isSubOwner(playerUuid)) {
             return false;
         }
 
@@ -222,14 +279,16 @@ public class Claim {
                 getMember(playerUuid);
 
         if (existingMember.isPresent()) {
-            existingMember.get().setName(playerName);
+            existingMember.get().setName(
+                    normalizePlayerName(playerName)
+            );
             return false;
         }
 
         return members.add(
                 new ClaimMember(
                         playerUuid,
-                        playerName
+                        normalizePlayerName(playerName)
                 )
         );
     }
@@ -251,11 +310,10 @@ public class Claim {
     }
 
     public boolean canLeave(UUID playerUuid) {
-        return playerUuid != null
-                && !isOwner(playerUuid)
-                && (isMember(playerUuid) || isSubOwner(playerUuid));
+        ClaimRole role = getRole(playerUuid);
+        return role == ClaimRole.MEMBER
+                || role == ClaimRole.SUBOWNER;
     }
-
 
     public Set<ClaimSubOwner> getSubOwners() {
         ensureSubOwners();
@@ -276,7 +334,10 @@ public class Claim {
                 .findFirst();
     }
 
-    public boolean addSubOwner(UUID playerUuid, String playerName) {
+    public boolean addSubOwner(
+            UUID playerUuid,
+            String playerName
+    ) {
         if (playerUuid == null || isOwner(playerUuid)) {
             return false;
         }
@@ -287,7 +348,9 @@ public class Claim {
                 getSubOwner(playerUuid);
 
         if (existingSubOwner.isPresent()) {
-            existingSubOwner.get().setName(playerName);
+            existingSubOwner.get().setName(
+                    normalizePlayerName(playerName)
+            );
             return false;
         }
 
@@ -296,7 +359,7 @@ public class Claim {
         return subOwners.add(
                 new ClaimSubOwner(
                         playerUuid,
-                        playerName
+                        normalizePlayerName(playerName)
                 )
         );
     }
@@ -314,7 +377,8 @@ public class Claim {
     }
 
     public boolean demoteSubOwnerToMember(UUID playerUuid) {
-        Optional<ClaimSubOwner> optionalSubOwner = getSubOwner(playerUuid);
+        Optional<ClaimSubOwner> optionalSubOwner =
+                getSubOwner(playerUuid);
 
         if (optionalSubOwner.isEmpty()) {
             return false;
@@ -326,22 +390,40 @@ public class Claim {
             return false;
         }
 
-        addMember(
+        removeMember(playerUuid);
+
+        return addMember(
                 subOwner.getUuid(),
                 subOwner.getName()
         );
-
-        return true;
     }
 
     public boolean isSubOwner(UUID playerUuid) {
         return getSubOwner(playerUuid).isPresent();
     }
 
+    public ClaimRole getRole(UUID playerUuid) {
+        if (playerUuid == null) {
+            return ClaimRole.NONE;
+        }
+
+        if (isOwner(playerUuid)) {
+            return ClaimRole.OWNER;
+        }
+
+        if (isSubOwner(playerUuid)) {
+            return ClaimRole.SUBOWNER;
+        }
+
+        if (isMember(playerUuid)) {
+            return ClaimRole.MEMBER;
+        }
+
+        return ClaimRole.NONE;
+    }
+
     public boolean canAccess(UUID playerUuid) {
-        return isOwner(playerUuid)
-                || isSubOwner(playerUuid)
-                || isMember(playerUuid);
+        return getRole(playerUuid).hasAccess();
     }
 
     public boolean hasAccess(UUID playerUuid) {
@@ -349,7 +431,7 @@ public class Claim {
     }
 
     public boolean canManage(UUID playerUuid) {
-        return isOwner(playerUuid) || isSubOwner(playerUuid);
+        return getRole(playerUuid).canManage();
     }
 
     public boolean canResize(UUID playerUuid) {
@@ -366,6 +448,10 @@ public class Claim {
 
     public boolean canEditPopup(UUID playerUuid) {
         return canManage(playerUuid);
+    }
+
+    public boolean canEditSubOwners(UUID playerUuid) {
+        return isOwner(playerUuid);
     }
 
     public boolean canTransfer(UUID playerUuid) {
@@ -438,5 +524,10 @@ public class Claim {
             popupSettings = new ClaimPopupSettings();
         }
     }
-}
 
+    private static String normalizePlayerName(String playerName) {
+        return playerName == null
+                ? ""
+                : playerName;
+    }
+}

@@ -2,6 +2,7 @@ package com.bananasandwich.bananaclaims.command;
 
 import com.bananasandwich.bananaclaims.Bananaclaims;
 import com.bananasandwich.bananaclaims.claim.Claim;
+import com.bananasandwich.bananaclaims.claim.ClaimMutationResult;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
@@ -134,22 +135,10 @@ public final class TransferClaimCommand {
             return 0;
         }
 
-        Claim claim = optionalClaim.get();
-
-        if (!claim.canTransfer(currentOwner.getUUID())) {
-            source.sendFailure(
-                    Component.literal(
-                            "You do not own this claim."
-                    )
-            );
-
-            return 0;
-        }
-
         return transferOwnership(
                 source,
                 currentOwner,
-                claim,
+                optionalClaim.get(),
                 playerName
         );
     }
@@ -219,84 +208,84 @@ public final class TransferClaimCommand {
         }
 
         ServerPlayer target = optionalTarget.get();
+        String previousOwnerName = currentOwner.getName().getString();
 
-        if (claim.isOwner(target.getUUID())) {
-            source.sendFailure(
-                    Component.literal(
-                            target.getName().getString()
-                                    + " already owns this claim."
-                    )
-            );
-
-            return 0;
-        }
-
-        boolean duplicateClaimName =
-                Bananaclaims.CLAIM_MANAGER
-                        .getClaimsForOwner(target.getUUID())
-                        .stream()
-                        .anyMatch(ownedClaim ->
-                                !ownedClaim.getClaimId()
-                                        .equals(claim.getClaimId())
-                                        && ownedClaim.getName()
-                                        .equalsIgnoreCase(
-                                                claim.getName()
-                                        )
-                        );
-
-        if (duplicateClaimName) {
-            source.sendFailure(
-                    Component.literal(
-                            target.getName().getString()
-                                    + " already owns a claim named \""
-                                    + claim.getName()
-                                    + "\". Rename one of the claims before transferring ownership."
-                    )
-            );
-
-            return 0;
-        }
-
-        String previousOwnerName =
-                currentOwner.getName().getString();
-
-        boolean transferred =
+        ClaimMutationResult result =
                 Bananaclaims.CLAIM_MANAGER.transferOwnership(
                         claim,
+                        currentOwner.getUUID(),
                         target.getUUID(),
                         target.getName().getString()
                 );
 
-        if (!transferred) {
-            source.sendFailure(
-                    Component.literal(
-                            "Unable to transfer ownership of that claim."
-                    )
-            );
+        return switch (result) {
+            case OWNERSHIP_TRANSFERRED -> {
+                source.sendSuccess(
+                        () -> Component.literal(
+                                "Transferred ownership of claim \""
+                                        + claim.getName()
+                                        + "\" to "
+                                        + target.getName().getString()
+                                        + ". You are now a member of the claim."
+                        ),
+                        false
+                );
 
-            return 0;
-        }
+                target.sendSystemMessage(
+                        Component.literal(
+                                previousOwnerName
+                                        + " transferred ownership of claim \""
+                                        + claim.getName()
+                                        + "\" to you."
+                        )
+                );
 
-        source.sendSuccess(
-                () -> Component.literal(
-                        "Transferred ownership of claim \""
-                                + claim.getName()
-                                + "\" to "
-                                + target.getName().getString()
-                                + ". You are now a member of the claim."
-                ),
-                false
-        );
+                yield 1;
+            }
 
-        target.sendSystemMessage(
-                Component.literal(
-                        previousOwnerName
-                                + " transferred ownership of claim \""
-                                + claim.getName()
-                                + "\" to you."
-                )
-        );
+            case SAME_OWNER -> {
+                source.sendFailure(
+                        Component.literal(
+                                target.getName().getString()
+                                        + " already owns this claim."
+                        )
+                );
 
-        return 1;
+                yield 0;
+            }
+
+            case DUPLICATE_OWNER_CLAIM_NAME -> {
+                source.sendFailure(
+                        Component.literal(
+                                target.getName().getString()
+                                        + " already owns a claim named \""
+                                        + claim.getName()
+                                        + "\". Rename one of the claims before transferring ownership."
+                        )
+                );
+
+                yield 0;
+            }
+
+            case NOT_AUTHORIZED -> {
+                source.sendFailure(
+                        Component.literal(
+                                "Only the current owner can transfer this claim."
+                        )
+                );
+
+                yield 0;
+            }
+
+            default -> {
+                source.sendFailure(
+                        Component.literal(
+                                "Unable to transfer ownership of that claim."
+                        )
+                );
+
+                yield 0;
+            }
+        };
     }
 }

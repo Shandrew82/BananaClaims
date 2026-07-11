@@ -2,6 +2,7 @@ package com.bananasandwich.bananaclaims.command.member;
 
 import com.bananasandwich.bananaclaims.Bananaclaims;
 import com.bananasandwich.bananaclaims.claim.Claim;
+import com.bananasandwich.bananaclaims.claim.ClaimMutationResult;
 import com.bananasandwich.bananaclaims.command.ClaimResolver;
 import com.bananasandwich.bananaclaims.command.ClaimSuggestions;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -65,11 +66,11 @@ public final class AddMemberCommand {
             CommandSourceStack source,
             String playerName
     ) throws CommandSyntaxException {
-        ServerPlayer owner =
+        ServerPlayer actor =
                 source.getPlayerOrException();
 
         Optional<Claim> optionalClaim =
-                ClaimResolver.findAtPlayer(owner);
+                ClaimResolver.findAtPlayer(actor);
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
@@ -81,21 +82,10 @@ public final class AddMemberCommand {
             return 0;
         }
 
-        Claim claim = optionalClaim.get();
-
-        if (!claim.canEditMembers(owner.getUUID())) {
-            source.sendFailure(
-                    Component.literal(
-                            "You cannot edit members for this claim."
-                    )
-            );
-
-            return 0;
-        }
-
         return addMember(
                 source,
-                claim,
+                actor,
+                optionalClaim.get(),
                 playerName
         );
     }
@@ -105,12 +95,12 @@ public final class AddMemberCommand {
             String claimName,
             String playerName
     ) throws CommandSyntaxException {
-        ServerPlayer owner =
+        ServerPlayer actor =
                 source.getPlayerOrException();
 
         Optional<Claim> optionalClaim =
                 ClaimResolver.findManagedByName(
-                        owner.getUUID(),
+                        actor.getUUID(),
                         claimName
                 );
 
@@ -126,27 +116,17 @@ public final class AddMemberCommand {
             return 0;
         }
 
-        Claim claim = optionalClaim.get();
-
-        if (!claim.canEditMembers(owner.getUUID())) {
-            source.sendFailure(
-                    Component.literal(
-                            "You cannot edit members for this claim."
-                    )
-            );
-
-            return 0;
-        }
-
         return addMember(
                 source,
-                claim,
+                actor,
+                optionalClaim.get(),
                 playerName
         );
     }
 
     private static int addMember(
             CommandSourceStack source,
+            ServerPlayer actor,
             Claim claim,
             String playerName
     ) {
@@ -176,81 +156,96 @@ public final class AddMemberCommand {
 
         ServerPlayer target = optionalTarget.get();
 
-        if (claim.isOwner(target.getUUID())) {
-            source.sendFailure(
-                    Component.literal(
-                            target.getName().getString()
-                                    + " already owns this claim."
-                    )
-            );
+        ClaimMutationResult result =
+                Bananaclaims.CLAIM_MANAGER.addMember(
+                        claim,
+                        actor.getUUID(),
+                        target.getUUID(),
+                        target.getName().getString()
+                );
 
-            return 0;
-        }
+        return switch (result) {
+            case MEMBER_ADDED -> {
+                source.sendSuccess(
+                        () -> Component.literal(
+                                "Added "
+                                        + target.getName().getString()
+                                        + " as a member of claim \""
+                                        + claim.getName()
+                                        + "\"."
+                        ),
+                        false
+                );
 
-        if (claim.isSubOwner(target.getUUID())) {
-            source.sendFailure(
-                    Component.literal(
-                            target.getName().getString()
-                                    + " is already a subowner of claim \""
-                                    + claim.getName()
-                                    + "\"."
-                    )
-            );
+                target.sendSystemMessage(
+                        Component.literal(
+                                "You were added as a member of claim \""
+                                        + claim.getName()
+                                        + "\" by "
+                                        + actor.getName().getString()
+                                        + "."
+                        )
+                );
 
-            return 0;
-        }
+                yield 1;
+            }
 
-        if (claim.isMember(target.getUUID())) {
-            source.sendFailure(
-                    Component.literal(
-                            target.getName().getString()
-                                    + " is already a member of claim \""
-                                    + claim.getName()
-                                    + "\"."
-                    )
-            );
+            case PLAYER_IS_OWNER -> {
+                source.sendFailure(
+                        Component.literal(
+                                target.getName().getString()
+                                        + " already owns this claim."
+                        )
+                );
 
-            return 0;
-        }
+                yield 0;
+            }
 
-        boolean added = claim.addMember(
-                target.getUUID(),
-                target.getName().getString()
-        );
+            case PLAYER_IS_SUBOWNER -> {
+                source.sendFailure(
+                        Component.literal(
+                                target.getName().getString()
+                                        + " is already a subowner of claim \""
+                                        + claim.getName()
+                                        + "\"."
+                        )
+                );
 
-        if (!added) {
-            source.sendFailure(
-                    Component.literal(
-                            "Unable to add that player as a member."
-                    )
-            );
+                yield 0;
+            }
 
-            return 0;
-        }
+            case PLAYER_IS_MEMBER -> {
+                source.sendFailure(
+                        Component.literal(
+                                target.getName().getString()
+                                        + " is already a member of claim \""
+                                        + claim.getName()
+                                        + "\"."
+                        )
+                );
 
-        Bananaclaims.CLAIM_MANAGER.saveClaims();
+                yield 0;
+            }
 
-        source.sendSuccess(
-                () -> Component.literal(
-                        "Added "
-                                + target.getName().getString()
-                                + " as a member of claim \""
-                                + claim.getName()
-                                + "\"."
-                ),
-                false
-        );
+            case NOT_AUTHORIZED -> {
+                source.sendFailure(
+                        Component.literal(
+                                "You cannot edit members for this claim."
+                        )
+                );
 
-        target.sendSystemMessage(
-                Component.literal(
-                        "You were added as a member of claim \""
-                                + claim.getName()
-                                + "\" by "
-                                + claim.getOwnerName()
-                                + "."
-                )
-        );
+                yield 0;
+            }
 
-        return 1;
+            default -> {
+                source.sendFailure(
+                        Component.literal(
+                                "Unable to add that player as a member."
+                        )
+                );
+
+                yield 0;
+            }
+        };
     }
 }

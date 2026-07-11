@@ -3,6 +3,7 @@ package com.bananasandwich.bananaclaims.command.member;
 import com.bananasandwich.bananaclaims.Bananaclaims;
 import com.bananasandwich.bananaclaims.claim.Claim;
 import com.bananasandwich.bananaclaims.claim.ClaimMember;
+import com.bananasandwich.bananaclaims.claim.ClaimMutationResult;
 import com.bananasandwich.bananaclaims.command.ClaimResolver;
 import com.bananasandwich.bananaclaims.command.ClaimSuggestions;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -66,11 +67,11 @@ public final class RemoveMemberCommand {
             CommandSourceStack source,
             String playerName
     ) throws CommandSyntaxException {
-        ServerPlayer owner =
+        ServerPlayer actor =
                 source.getPlayerOrException();
 
         Optional<Claim> optionalClaim =
-                ClaimResolver.findAtPlayer(owner);
+                ClaimResolver.findAtPlayer(actor);
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
@@ -82,21 +83,10 @@ public final class RemoveMemberCommand {
             return 0;
         }
 
-        Claim claim = optionalClaim.get();
-
-        if (!claim.canEditMembers(owner.getUUID())) {
-            source.sendFailure(
-                    Component.literal(
-                            "You cannot edit members for this claim."
-                    )
-            );
-
-            return 0;
-        }
-
         return removeMember(
                 source,
-                claim,
+                actor,
+                optionalClaim.get(),
                 playerName
         );
     }
@@ -106,12 +96,12 @@ public final class RemoveMemberCommand {
             String claimName,
             String playerName
     ) throws CommandSyntaxException {
-        ServerPlayer owner =
+        ServerPlayer actor =
                 source.getPlayerOrException();
 
         Optional<Claim> optionalClaim =
                 ClaimResolver.findManagedByName(
-                        owner.getUUID(),
+                        actor.getUUID(),
                         claimName
                 );
 
@@ -127,27 +117,17 @@ public final class RemoveMemberCommand {
             return 0;
         }
 
-        Claim claim = optionalClaim.get();
-
-        if (!claim.canEditMembers(owner.getUUID())) {
-            source.sendFailure(
-                    Component.literal(
-                            "You cannot edit members for this claim."
-                    )
-            );
-
-            return 0;
-        }
-
         return removeMember(
                 source,
-                claim,
+                actor,
+                optionalClaim.get(),
                 playerName
         );
     }
 
     private static int removeMember(
             CommandSourceStack source,
+            ServerPlayer actor,
             Claim claim,
             String playerName
     ) {
@@ -165,7 +145,7 @@ public final class RemoveMemberCommand {
                     Component.literal(
                             "\""
                                     + playerName
-                                    + "\" is not a member of claim \""
+                                    + "\" is not a regular member of claim \""
                                     + claim.getName()
                                     + "\"."
                     )
@@ -176,20 +156,24 @@ public final class RemoveMemberCommand {
 
         ClaimMember member = optionalMember.get();
 
-        boolean removed =
-                claim.removeMember(member.getUuid());
+        ClaimMutationResult result =
+                Bananaclaims.CLAIM_MANAGER.removeMember(
+                        claim,
+                        actor.getUUID(),
+                        member.getUuid()
+                );
 
-        if (!removed) {
+        if (result != ClaimMutationResult.MEMBER_REMOVED) {
             source.sendFailure(
                     Component.literal(
-                            "Unable to remove that member."
+                            result == ClaimMutationResult.NOT_AUTHORIZED
+                                    ? "You cannot edit members for this claim."
+                                    : "Unable to remove that member."
                     )
             );
 
             return 0;
         }
-
-        Bananaclaims.CLAIM_MANAGER.saveClaims();
 
         source.sendSuccess(
                 () -> Component.literal(
@@ -216,7 +200,9 @@ public final class RemoveMemberCommand {
                                 Component.literal(
                                         "You were removed from claim \""
                                                 + claim.getName()
-                                                + "\"."
+                                                + "\" by "
+                                                + actor.getName().getString()
+                                                + "."
                                 )
                         )
                 );
