@@ -25,14 +25,14 @@ public final class InviteClaimCommand {
     public static LiteralArgumentBuilder<CommandSourceStack> register() {
         return Commands.literal("invite")
                 .then(Commands.literal("accept")
-                        .then(Commands.argument("claim", StringArgumentType.word())
+                        .then(Commands.argument("claim", StringArgumentType.greedyString())
                                 .suggests(ClaimSuggestions.INCOMING_INVITE_CLAIMS)
                                 .executes(context -> accept(
                                         context.getSource(),
                                         StringArgumentType.getString(context, "claim")
                                 ))))
                 .then(Commands.literal("deny")
-                        .then(Commands.argument("claim", StringArgumentType.word())
+                        .then(Commands.argument("claim", StringArgumentType.greedyString())
                                 .suggests(ClaimSuggestions.INCOMING_INVITE_CLAIMS)
                                 .executes(context -> deny(
                                         context.getSource(),

@@ -8,7 +8,8 @@
     "PressurePlateEntityFilterMixin",
     "WeightedPressurePlateEntityFilterMixin",
     "ProtectedEntityDamageMixin",
-    "ServerExplosionMixin"
+    "ServerExplosionMixin",
+    "ServerCustomClickActionMixin"
   ],
   "injectors": {
     "defaultRequire": 1

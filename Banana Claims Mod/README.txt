@@ -1,17 +1,18 @@
-BANANA CLAIMS FINAL FEATURE BUILD
+Banana Claims - Book GUI and Invitation Hotfix
 
-This package adds the final pre-1.0 feature set:
-- Time-limited claim invitations
-- Optional server-generated Book GUI
-- Per-claim BlueMap colors and opacity
-- Book/Invite/BlueMap permission nodes
-- Updated configuration, localization, release docs, and staff guide
+Fixes:
+- /claim book grants one physical Banana Claims written book when the player does not already have one.
+- Book buttons use custom click actions instead of RUN_COMMAND, removing the unattended-command warning.
+- Normal book actions keep the player on the current page.
+- Text-based book actions use vanilla text-input dialogs and execute the entered value.
+- Transfer, rename, description, popup text/sounds, invitations, and BlueMap values now execute instead of only suggesting chat text.
+- Claim protection buttons persist their actual claim flags and provide chat confirmation.
+- BlueMap fill and line hex arguments accept #RRGGBB and bare RRGGBB values.
+- Invitation Accept/Deny selectors accept claim@inviter without trailing-data errors.
+- Destructive book actions use vanilla confirmation dialogs and return to the same book page.
 
-INSTALL
-1. Back up your project and config/bananaclaims directory.
-2. Extract this package into the project root.
-3. Allow complete replacement files to overwrite.
-4. Run VERIFY_FINAL_FEATURE_BUILD.ps1.
-5. Run .\gradlew.bat clean build.
+Important server-only GUI limitation:
+The currently open written-book screen keeps the same page after an action, but its rendered text is a snapshot. The physical inventory copy is refreshed immediately; close and reopen the book to see updated labels and values on that page.
 
-The included config/bananaclaims.json is a reference/default project config. Preserve customized production config values and merge the invitations section when necessary.
+Install:
+Extract this ZIP directly into the project root and replace existing files. Then run VERIFY_BOOK_GUI_HOTFIX.ps1 and build with .\gradlew.bat clean build.

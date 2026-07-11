@@ -16,9 +16,13 @@ import com.bananasandwich.bananaclaims.permission.ClaimPermission;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.Comparator;
 import java.util.HashMap;
@@ -60,10 +64,110 @@ public final class ClaimBookManager {
             return false;
         }
 
+        PreparedBook prepared = prepareBook(
+                player,
+                requestedClaim,
+                true
+        );
+
+        if (prepared == null) {
+            return false;
+        }
+
+        BookPacketSender.open(
+                player,
+                prepared.book()
+        );
+        return true;
+    }
+
+    /** Refreshes a physical Banana Claims book immediately before use. */
+    public boolean refreshForUse(
+            ServerPlayer player,
+            ItemStack stack
+    ) {
+        if (player == null
+                || !BookPacketSender.isClaimBook(stack)) {
+            return false;
+        }
+
+        Claim requested = BookPacketSender.getSelectedClaimId(stack)
+                .flatMap(Bananaclaims.CLAIM_MANAGER::getClaimById)
+                .filter(claim -> claim.hasAccess(player.getUUID()))
+                .orElse(null);
+
+        PreparedBook prepared = prepareBook(
+                player,
+                requested,
+                false
+        );
+
+        if (prepared == null) {
+            return false;
+        }
+
+        BookPacketSender.updateBook(
+                stack,
+                prepared.title(),
+                prepared.pages(),
+                prepared.selectedClaimId()
+        );
+        return true;
+    }
+
+    /** Updates the physical inventory copy without reopening or changing pages. */
+    public void refreshPhysicalBook(ServerPlayer player) {
+        if (player == null) {
+            return;
+        }
+
+        BookSession session = sessions.get(player.getUUID());
+        ItemStack physicalBook = findPhysicalBook(player);
+
+        if (session == null || physicalBook == null) {
+            return;
+        }
+
+        List<Claim> claims = accessibleClaims(player);
+        Claim selected = session.selectedClaimId() == null
+                ? null
+                : Bananaclaims.CLAIM_MANAGER
+                .getClaimById(session.selectedClaimId())
+                .filter(claim -> claim.hasAccess(player.getUUID()))
+                .orElse(null);
+
+        if (selected == null) {
+            selected = selectClaim(player, null, claims);
+        }
+
+        BookSession refreshedSession = new BookSession(
+                session.token(),
+                session.playerUuid(),
+                selected == null ? null : selected.getClaimId(),
+                session.expiryTick()
+        );
+        sessions.put(player.getUUID(), refreshedSession);
+
+        BookPacketSender.updateBook(
+                physicalBook,
+                selected == null ? "Banana Claims" : selected.getName(),
+                buildPages(player, refreshedSession, selected, claims),
+                selected == null ? null : selected.getClaimId()
+        );
+
+        player.inventoryMenu.broadcastChanges();
+    }
+
+    private PreparedBook prepareBook(
+            ServerPlayer player,
+            Claim requestedClaim,
+            boolean giveIfMissing
+    ) {
         List<Claim> accessibleClaims = accessibleClaims(player);
         Claim selected = selectClaim(player, requestedClaim, accessibleClaims);
         String token = createToken();
-        long expiry = player.level().getServer().getTickCount() + SESSION_DURATION_TICKS;
+        long expiry = player.level().getServer().getTickCount()
+                + SESSION_DURATION_TICKS;
 
         BookSession session = new BookSession(
                 token,
@@ -73,12 +177,172 @@ public final class ClaimBookManager {
         );
         sessions.put(player.getUUID(), session);
 
-        BookPacketSender.open(
+        List<Component> pages = buildPages(
                 player,
-                selected == null ? "Banana Claims" : selected.getName(),
-                buildPages(player, session, selected, accessibleClaims)
+                session,
+                selected,
+                accessibleClaims
         );
+
+        String title = selected == null
+                ? "Banana Claims"
+                : selected.getName();
+
+        ItemStack physicalBook = findPhysicalBook(player);
+        boolean created = false;
+
+        if (physicalBook == null && giveIfMissing) {
+            ItemStack newBook = BookPacketSender.createBook(
+                    title,
+                    pages,
+                    selected == null ? null : selected.getClaimId()
+            );
+
+            if (player.getInventory().add(newBook)) {
+                physicalBook = findPhysicalBook(player);
+                created = true;
+            } else {
+                player.sendSystemMessage(Component.literal(
+                        "Your inventory is full, so the Banana Claims book could not be added."
+                ).withStyle(ChatFormatting.RED));
+            }
+        }
+
+        if (physicalBook == null) {
+            physicalBook = BookPacketSender.createBook(
+                    title,
+                    pages,
+                    selected == null ? null : selected.getClaimId()
+            );
+        } else {
+            BookPacketSender.updateBook(
+                    physicalBook,
+                    title,
+                    pages,
+                    selected == null ? null : selected.getClaimId()
+            );
+            player.inventoryMenu.broadcastChanges();
+        }
+
+        if (created) {
+            player.sendSystemMessage(Component.literal(
+                    "You received a Banana Claims management book. Right-click it at any time to reopen the menu."
+            ).withStyle(ChatFormatting.GOLD));
+        }
+
+        return new PreparedBook(
+                physicalBook,
+                title,
+                pages,
+                selected == null ? null : selected.getClaimId()
+        );
+    }
+
+    private ItemStack findPhysicalBook(ServerPlayer player) {
+        for (int slot = 0;
+             slot < player.getInventory().getContainerSize();
+             slot++) {
+            ItemStack stack = player.getInventory().getItem(slot);
+            if (BookPacketSender.isClaimBook(stack)) {
+                return stack;
+            }
+        }
+        return null;
+    }
+
+    /** Handles warning-free custom click actions sent by books and dialogs. */
+    public boolean handleCustomClick(
+            ServerPlayer player,
+            Identifier id,
+            Optional<Tag> payload
+    ) {
+        if (player == null || id == null) {
+            return false;
+        }
+
+        if (!Bananaclaims.MOD_ID.equals(id.getNamespace())) {
+            return false;
+        }
+
+        CompoundTag data = payload
+                .filter(CompoundTag.class::isInstance)
+                .map(CompoundTag.class::cast)
+                .orElse(null);
+
+        if (data == null) {
+            return false;
+        }
+
+        String command;
+
+        if ("book_command".equals(id.getPath())) {
+            command = data.getString("command").orElse("");
+        } else if ("book_prompt".equals(id.getPath())) {
+            String prefix = data.getString("prefix").orElse("");
+            String value = data.getString("value").orElse("").trim();
+
+            if (value.isBlank()) {
+                fail(player, "A value is required.");
+                return true;
+            }
+
+            command = prefix + value;
+        } else {
+            return false;
+        }
+
+        String normalized = command == null ? "" : command.trim();
+        if (!(normalized.equals("/claim") || normalized.startsWith("/claim "))
+                || normalized.length() > 1024) {
+            fail(player, "That book action was rejected.");
+            return true;
+        }
+
+        player.level()
+                .getServer()
+                .getCommands()
+                .performPrefixedCommand(
+                        player.createCommandSourceStack(),
+                        normalized
+                );
+
+        refreshPhysicalBook(player);
         return true;
+    }
+
+    private BookSession resolveSession(
+            ServerPlayer player,
+            String token
+    ) {
+        long currentTick = player.level().getServer().getTickCount();
+        BookSession existing = sessions.get(player.getUUID());
+
+        if (existing != null
+                && existing.token().equals(token)
+                && existing.expiryTick() >= currentTick) {
+            return existing;
+        }
+
+        ItemStack physicalBook = findPhysicalBook(player);
+        if (physicalBook == null) {
+            sessions.remove(player.getUUID());
+            return null;
+        }
+
+        UUID selectedClaimId = BookPacketSender.getSelectedClaimId(physicalBook)
+                .flatMap(Bananaclaims.CLAIM_MANAGER::getClaimById)
+                .filter(claim -> claim.hasAccess(player.getUUID()))
+                .map(Claim::getClaimId)
+                .orElse(null);
+
+        BookSession recovered = new BookSession(
+                token,
+                player.getUUID(),
+                selectedClaimId,
+                currentTick + SESSION_DURATION_TICKS
+        );
+        sessions.put(player.getUUID(), recovered);
+        return recovered;
     }
 
     public int handleAction(
@@ -87,14 +351,11 @@ public final class ClaimBookManager {
             String action,
             String argument
     ) {
-        BookSession session = sessions.get(player.getUUID());
-        if (session == null
-                || !session.token().equals(token)
-                || session.expiryTick() < player.level().getServer().getTickCount()) {
+        BookSession session = resolveSession(player, token);
+        if (session == null) {
             player.sendSystemMessage(Component.literal(
-                    "That Banana Claims book session expired. Run /claim book again."
+                    "That Banana Claims book is stale. Run /claim book to refresh it."
             ).withStyle(ChatFormatting.RED));
-            sessions.remove(player.getUUID());
             return 0;
         }
 
@@ -154,13 +415,14 @@ public final class ClaimBookManager {
             return fail(player, "Unable to show that claim preview.");
         }
         player.sendSystemMessage(Component.literal("Showing preview for " + claim.getName() + "."));
-        open(player, claim);
+        refreshPhysicalBook(player);
         return 1;
     }
 
     private int stopPreview(ServerPlayer player, Claim claim) {
         Bananaclaims.DISPLAY_PREVIEW_V2_MANAGER.stop(player.getUUID());
-        open(player, claim);
+        player.sendSystemMessage(Component.literal("Stopped your claim preview."));
+        refreshPhysicalBook(player);
         return 1;
     }
 
@@ -175,9 +437,20 @@ public final class ClaimBookManager {
             return fail(player, "Unknown claim protection setting.");
         }
         ClaimFlagDefinition flag = definition.get();
-        flag.setValue(claim.getFlags(), !flag.getValue(claim.getFlags()));
-        Bananaclaims.CLAIM_MANAGER.markClaimUpdated(claim);
-        open(player, claim);
+        boolean newValue = !flag.getValue(claim.getFlags());
+        flag.setValue(claim.getFlags(), newValue);
+
+        if (!Bananaclaims.CLAIM_MANAGER.markClaimUpdated(claim)) {
+            return fail(player, "The protection setting could not be saved.");
+        }
+
+        player.sendSystemMessage(Component.literal(
+                flag.getCanonicalName()
+                        + " is now "
+                        + (newValue ? "protected" : "open")
+                        + " for outsiders."
+        ).withStyle(newValue ? ChatFormatting.GREEN : ChatFormatting.GOLD));
+        refreshPhysicalBook(player);
         return 1;
     }
 
@@ -195,7 +468,10 @@ public final class ClaimBookManager {
         };
         claim.getPopupSettings().setDisplayMode(next);
         Bananaclaims.CLAIM_MANAGER.markClaimUpdated(claim);
-        open(player, claim);
+        player.sendSystemMessage(Component.literal(
+                "Notification mode changed to " + next.name() + "."
+        ));
+        refreshPhysicalBook(player);
         return 1;
     }
 
@@ -208,7 +484,7 @@ public final class ClaimBookManager {
         } else {
             PopupRenderer.showLeave(player, claim);
         }
-        open(player, claim);
+        refreshPhysicalBook(player);
         return 1;
     }
 
@@ -230,7 +506,10 @@ public final class ClaimBookManager {
         claim.getBlueMapStyle().setFillColor(color);
         claim.getBlueMapStyle().setLineColor(color);
         Bananaclaims.CLAIM_MANAGER.markClaimUpdated(claim);
-        open(player, claim);
+        player.sendSystemMessage(Component.literal(
+                "BlueMap fill and border colors changed to " + color + "."
+        ));
+        refreshPhysicalBook(player);
         return 1;
     }
 
@@ -242,7 +521,8 @@ public final class ClaimBookManager {
         }
         claim.getBlueMapStyle().reset();
         Bananaclaims.CLAIM_MANAGER.markClaimUpdated(claim);
-        open(player, claim);
+        player.sendSystemMessage(Component.literal("BlueMap style reset to the server defaults."));
+        refreshPhysicalBook(player);
         return 1;
     }
 
@@ -263,7 +543,10 @@ public final class ClaimBookManager {
         if (result != InvitationResult.ACCEPTED) {
             return fail(player, "The invitation could not be accepted.");
         }
-        open(player, claim.get());
+        player.sendSystemMessage(Component.literal(
+                "You joined claim \"" + claim.get().getName() + "\"."
+        ).withStyle(ChatFormatting.GREEN));
+        refreshPhysicalBook(player);
         return 1;
     }
 
@@ -278,7 +561,10 @@ public final class ClaimBookManager {
             return fail(player, "That claim no longer exists.");
         }
         Bananaclaims.INVITATION_MANAGER.deny(player, claim.get());
-        open(player);
+        player.sendSystemMessage(Component.literal(
+                "Denied the invitation to \"" + claim.get().getName() + "\"."
+        ));
+        refreshPhysicalBook(player);
         return 1;
     }
 
@@ -321,7 +607,7 @@ public final class ClaimBookManager {
         if (result != ClaimMutationResult.MEMBER_REMOVED) {
             return fail(player, "The member could not be removed.");
         }
-        open(player, claim);
+        refreshPhysicalBook(player);
         return 1;
     }
 
@@ -364,7 +650,7 @@ public final class ClaimBookManager {
         if (!result.isSuccess()) {
             return fail(player, "The member could not be promoted.");
         }
-        open(player, claim);
+        refreshPhysicalBook(player);
         return 1;
     }
 
@@ -406,7 +692,7 @@ public final class ClaimBookManager {
         if (!result.isSuccess()) {
             return fail(player, "The subowner could not be demoted.");
         }
-        open(player, claim);
+        refreshPhysicalBook(player);
         return 1;
     }
 
@@ -433,7 +719,7 @@ public final class ClaimBookManager {
                     ? "Owners must transfer or delete their claim."
                     : "You could not leave that claim.");
         }
-        open(player);
+        refreshPhysicalBook(player);
         return 1;
     }
 
@@ -446,7 +732,7 @@ public final class ClaimBookManager {
         if (!Bananaclaims.CLAIM_MANAGER.removeClaim(claim)) {
             return fail(player, "The claim could not be deleted.");
         }
-        open(player);
+        refreshPhysicalBook(player);
         return 1;
     }
 
@@ -458,23 +744,14 @@ public final class ClaimBookManager {
             String action,
             String argument
     ) {
-        MutableComponent page = BookComponents.page();
-        BookComponents.line(page, BookComponents.title(heading));
-        BookComponents.blank(page);
-        BookComponents.line(page, BookComponents.value(subject));
-        BookComponents.blank(page);
-        page.append(BookComponents.action(
-                "[Confirm]",
-                actionCommand(session, action, argument),
-                ChatFormatting.RED
-        ));
-        page.append("  ");
-        page.append(BookComponents.action(
-                "[Cancel]",
-                "/claim book",
-                ChatFormatting.DARK_GREEN
-        ));
-        BookPacketSender.open(player, "Confirm Action", List.of(page));
+        BookPacketSender.showDialog(
+                player,
+                BookDialogs.confirmation(
+                        heading,
+                        subject,
+                        actionCommand(session, action, argument)
+                )
+        );
         return 1;
     }
 
@@ -569,8 +846,24 @@ public final class ClaimBookManager {
         page.append(BookComponents.action("[Stop]", actionCommand(session, "preview_stop", "none"), ChatFormatting.RED));
         BookComponents.line(page, Component.empty());
         if (claim.canManage(player.getUUID())) {
-            BookComponents.line(page, BookComponents.suggest("[Rename]", "/claim rename " + claim.getName() + " ", ChatFormatting.BLUE));
-            BookComponents.line(page, BookComponents.suggest("[Edit Description]", "/claim description " + claim.getName() + " ", ChatFormatting.BLUE));
+            BookComponents.line(page, BookComponents.input(
+                    "[Rename]",
+                    "New claim name",
+                    claim.getName(),
+                    64,
+                    false,
+                    "/claim rename " + claim.getName() + " ",
+                    ChatFormatting.BLUE
+            ));
+            BookComponents.line(page, BookComponents.input(
+                    "[Edit Description]",
+                    "Claim description",
+                    claim.getDescription(),
+                    256,
+                    true,
+                    "/claim description " + claim.getName() + " ",
+                    ChatFormatting.BLUE
+            ));
         }
         navigation(page);
         return page;
@@ -592,13 +885,21 @@ public final class ClaimBookManager {
         page.append(BookComponents.pageLink("[My Invites]", 9, ChatFormatting.GOLD));
         if (claim.canEditMembers(player.getUUID()) && allowed(player, ClaimPermission.INVITE)) {
             BookComponents.blank(page);
-            BookComponents.line(page, BookComponents.suggest(
+            BookComponents.line(page, BookComponents.input(
                     "[Invite Player]",
+                    "Player name",
+                    "",
+                    16,
+                    false,
                     "/claim invite for " + claim.getName() + " ",
                     ChatFormatting.DARK_GREEN
             ));
-            BookComponents.line(page, BookComponents.suggest(
+            BookComponents.line(page, BookComponents.input(
                     "[Cancel Invite]",
+                    "Player name",
+                    "",
+                    16,
+                    false,
                     "/claim invite cancel-for " + claim.getName() + " ",
                     ChatFormatting.RED
             ));
@@ -620,13 +921,14 @@ public final class ClaimBookManager {
             boolean enabled = flag.getValue(claim.getFlags());
             Component status = editable
                     ? BookComponents.action(
-                    enabled ? "[ON]" : "[OFF]",
+                    enabled ? "[LOCKED]" : "[OPEN]",
                     actionCommand(session, "toggle_flag", flag.getCanonicalName()),
                     enabled ? ChatFormatting.DARK_GREEN : ChatFormatting.RED
             )
                     : BookComponents.status(enabled);
             BookComponents.line(page, Component.literal(shortFlagName(flag) + ": ").append(status));
         }
+        BookComponents.line(page, BookComponents.label("Members bypass these settings."));
         navigation(page);
         return page;
     }
@@ -639,12 +941,12 @@ public final class ClaimBookManager {
         BookComponents.line(page, BookComponents.value("Mode: " + claim.getPopupSettings().getDisplayMode().name()));
         if (claim.canEditPopup(player.getUUID()) && allowed(player, ClaimPermission.POPUP)) {
             BookComponents.line(page, BookComponents.action("[Cycle Mode]", actionCommand(session, "cycle_popup", "none"), ChatFormatting.BLUE));
-            BookComponents.line(page, BookComponents.suggest("[Enter Title]", "/claim popup " + claim.getName() + " set enterTitle ", ChatFormatting.DARK_GREEN));
-            BookComponents.line(page, BookComponents.suggest("[Enter Subtitle]", "/claim popup " + claim.getName() + " set enterSubtitle ", ChatFormatting.DARK_GREEN));
-            BookComponents.line(page, BookComponents.suggest("[Leave Title]", "/claim popup " + claim.getName() + " set leaveTitle ", ChatFormatting.GOLD));
-            BookComponents.line(page, BookComponents.suggest("[Leave Subtitle]", "/claim popup " + claim.getName() + " set leaveSubtitle ", ChatFormatting.GOLD));
-            BookComponents.line(page, BookComponents.suggest("[Enter Sound]", "/claim popup " + claim.getName() + " set enterSound ", ChatFormatting.BLUE));
-            BookComponents.line(page, BookComponents.suggest("[Leave Sound]", "/claim popup " + claim.getName() + " set leaveSound ", ChatFormatting.BLUE));
+            BookComponents.line(page, BookComponents.input("[Enter Title]", "Enter title", claim.getPopupSettings().getEnterTitle(), 256, true, "/claim popup " + claim.getName() + " set enterTitle ", ChatFormatting.DARK_GREEN));
+            BookComponents.line(page, BookComponents.input("[Enter Subtitle]", "Enter subtitle", claim.getPopupSettings().getEnterSubtitle(), 256, true, "/claim popup " + claim.getName() + " set enterSubtitle ", ChatFormatting.DARK_GREEN));
+            BookComponents.line(page, BookComponents.input("[Leave Title]", "Leave title", claim.getPopupSettings().getLeaveTitle(), 256, true, "/claim popup " + claim.getName() + " set leaveTitle ", ChatFormatting.GOLD));
+            BookComponents.line(page, BookComponents.input("[Leave Subtitle]", "Leave subtitle", claim.getPopupSettings().getLeaveSubtitle(), 256, true, "/claim popup " + claim.getName() + " set leaveSubtitle ", ChatFormatting.GOLD));
+            BookComponents.line(page, BookComponents.input("[Enter Sound]", "Sound identifier", claim.getPopupSettings().getEnterSound(), 128, false, "/claim popup " + claim.getName() + " set enterSound ", ChatFormatting.BLUE));
+            BookComponents.line(page, BookComponents.input("[Leave Sound]", "Sound identifier", claim.getPopupSettings().getLeaveSound(), 128, false, "/claim popup " + claim.getName() + " set leaveSound ", ChatFormatting.BLUE));
         }
         page.append(BookComponents.action("[Test Enter]", actionCommand(session, "popup_enter", "none"), ChatFormatting.DARK_GREEN));
         page.append(" ");
@@ -676,10 +978,58 @@ public final class ClaimBookManager {
             page.append(" ");
             page.append(BookComponents.action("[Cyan]", actionCommand(session, "bluemap_preset", "cyan"), ChatFormatting.AQUA));
             BookComponents.line(page, Component.empty());
-            BookComponents.line(page, BookComponents.suggest("[Custom Fill]", "/claim bluemap " + claim.getName() + " fill #", ChatFormatting.BLUE));
-            BookComponents.line(page, BookComponents.suggest("[Custom Line]", "/claim bluemap " + claim.getName() + " line #", ChatFormatting.BLUE));
-            BookComponents.line(page, BookComponents.suggest("[Opacity]", "/claim bluemap " + claim.getName() + " fillopacity ", ChatFormatting.BLUE));
-            BookComponents.line(page, BookComponents.action("[Reset]", actionCommand(session, "bluemap_reset", "none"), ChatFormatting.RED));
+            page.append(BookComponents.input(
+                    "[Fill Color]",
+                    "Hex color (#RRGGBB)",
+                    style.getFillColor(),
+                    9,
+                    false,
+                    "/claim bluemap " + claim.getName() + " fill ",
+                    ChatFormatting.BLUE
+            ));
+            page.append(" ");
+            page.append(BookComponents.input(
+                    "[Line Color]",
+                    "Hex color (#RRGGBB)",
+                    style.getLineColor(),
+                    9,
+                    false,
+                    "/claim bluemap " + claim.getName() + " line ",
+                    ChatFormatting.BLUE
+            ));
+            page.append("\n");
+            page.append(BookComponents.input(
+                    "[Fill Alpha]",
+                    "Opacity (0.0 to 1.0)",
+                    Float.toString(style.getFillOpacity()),
+                    8,
+                    false,
+                    "/claim bluemap " + claim.getName() + " fillopacity ",
+                    ChatFormatting.AQUA
+            ));
+            page.append(" ");
+            page.append(BookComponents.input(
+                    "[Line Alpha]",
+                    "Opacity (0.0 to 1.0)",
+                    Float.toString(style.getLineOpacity()),
+                    8,
+                    false,
+                    "/claim bluemap " + claim.getName() + " lineopacity ",
+                    ChatFormatting.AQUA
+            ));
+            page.append("\n");
+            page.append(BookComponents.input(
+                    "[Line Width]",
+                    "Width (1 to 10)",
+                    Integer.toString(style.getLineWidth()),
+                    2,
+                    false,
+                    "/claim bluemap " + claim.getName() + " linewidth ",
+                    ChatFormatting.DARK_PURPLE
+            ));
+            page.append(" ");
+            page.append(BookComponents.action("[Reset]", actionCommand(session, "bluemap_reset", "none"), ChatFormatting.RED));
+            page.append("\n");
         }
         navigation(page);
         return page;
@@ -689,8 +1039,8 @@ public final class ClaimBookManager {
         MutableComponent page = baseClaimPage("Claim Tools", claim);
         BookComponents.line(page, BookComponents.action("[Set Pos 1]", "/claim pos1", ChatFormatting.BLUE));
         BookComponents.line(page, BookComponents.action("[Set Pos 2]", "/claim pos2", ChatFormatting.BLUE));
-        BookComponents.line(page, BookComponents.suggest("[Create Area]", "/claim createarea ", ChatFormatting.DARK_GREEN));
-        BookComponents.line(page, BookComponents.suggest("[Create Here]", "/claim create ", ChatFormatting.DARK_GREEN));
+        BookComponents.line(page, BookComponents.input("[Create Area]", "Claim name", "", 64, false, "/claim createarea ", ChatFormatting.DARK_GREEN));
+        BookComponents.line(page, BookComponents.input("[Create Here]", "Claim name", "", 64, false, "/claim create ", ChatFormatting.DARK_GREEN));
         if (claim != null && claim.canResize(player.getUUID())) {
             BookComponents.blank(page);
             BookComponents.line(page, BookComponents.action("[Expand Here]", "/claim expand " + claim.getName(), ChatFormatting.GOLD));
@@ -710,7 +1060,7 @@ public final class ClaimBookManager {
         ClaimRole role = claim.getRole(player.getUUID());
         BookComponents.line(page, BookComponents.value("Role: " + role.name()));
         if (role == ClaimRole.OWNER) {
-            BookComponents.line(page, BookComponents.suggest("[Transfer]", "/claim transfer " + claim.getName() + " ", ChatFormatting.GOLD));
+            BookComponents.line(page, BookComponents.input("[Transfer]", "New owner name", "", 16, false, "/claim transfer " + claim.getName() + " ", ChatFormatting.GOLD));
             BookComponents.blank(page);
             BookComponents.line(page, BookComponents.action("[Delete Claim]", actionCommand(session, "confirm_delete", "none"), ChatFormatting.RED));
         } else if (role == ClaimRole.MEMBER || role == ClaimRole.SUBOWNER) {
@@ -920,6 +1270,14 @@ public final class ClaimBookManager {
             case EXPLOSIONS -> "Explosions";
             default -> flag.getCanonicalName();
         };
+    }
+
+    private record PreparedBook(
+            ItemStack book,
+            String title,
+            List<Component> pages,
+            UUID selectedClaimId
+    ) {
     }
 
     private record BookSession(

@@ -30,7 +30,7 @@ public final class BlueMapClaimCommand {
                                 StringArgumentType.getString(context, "claim")
                         ))
                         .then(Commands.literal("fill")
-                                .then(Commands.argument("hex", StringArgumentType.word())
+                                .then(Commands.argument("hex", StringArgumentType.greedyString())
                                         .executes(context -> setColor(
                                                 context.getSource(),
                                                 StringArgumentType.getString(context, "claim"),
@@ -38,7 +38,7 @@ public final class BlueMapClaimCommand {
                                                 true
                                         ))))
                         .then(Commands.literal("line")
-                                .then(Commands.argument("hex", StringArgumentType.word())
+                                .then(Commands.argument("hex", StringArgumentType.greedyString())
                                         .executes(context -> setColor(
                                                 context.getSource(),
                                                 StringArgumentType.getString(context, "claim"),

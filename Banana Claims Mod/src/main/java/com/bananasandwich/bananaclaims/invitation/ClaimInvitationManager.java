@@ -11,7 +11,7 @@ import com.bananasandwich.bananaclaims.localization.BananaClaimsMessages;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.ChatFormatting;
-import net.minecraft.network.chat.ClickEvent;
+import com.bananasandwich.bananaclaims.book.BookComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -362,20 +362,16 @@ public final class ClaimInvitationManager {
                 configManager.getInvitationExpirationSeconds()
         );
 
-        Component accept = Component.literal(" [Accept]")
-                .withStyle(style -> style
-                        .withColor(ChatFormatting.GREEN)
-                        .withUnderlined(true)
-                        .withClickEvent(new ClickEvent.RunCommand(
-                                "/claim invite accept " + invitation.selector()
-                        )));
-        Component deny = Component.literal(" [Deny]")
-                .withStyle(style -> style
-                        .withColor(ChatFormatting.RED)
-                        .withUnderlined(true)
-                        .withClickEvent(new ClickEvent.RunCommand(
-                                "/claim invite deny " + invitation.selector()
-                        )));
+        Component accept = BookComponents.action(
+                " [Accept]",
+                "/claim invite accept " + invitation.selector(),
+                ChatFormatting.GREEN
+        );
+        Component deny = BookComponents.action(
+                " [Deny]",
+                "/claim invite deny " + invitation.selector(),
+                ChatFormatting.RED
+        );
 
         invitee.sendSystemMessage(message.copy().append(accept).append(deny));
     }
