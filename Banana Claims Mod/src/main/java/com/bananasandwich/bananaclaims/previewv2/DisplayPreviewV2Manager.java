@@ -44,6 +44,9 @@ public final class DisplayPreviewV2Manager {
     private static final int PACKET_ENTITY_ID_FLOOR =
             1_500_000_000;
 
+    private static final float ANIMATION_SCALE_EPSILON =
+            0.0005F;
+
     private final PreviewV2ConfigManager configManager;
 
     private final Map<UUID, DisplaySession> sessions =
@@ -1083,7 +1086,18 @@ public final class DisplayPreviewV2Manager {
             return false;
         }
 
-        List<Integer> entityIds =
+        long currentTick =
+                server.getTickCount();
+
+        AnimationTimeline animation =
+                AnimationTimeline.resolve(config);
+
+        float initialScale =
+                animation.fadeInTicks() > 0
+                        ? animation.minimumScale()
+                        : 1.0F;
+
+        List<ClientDisplay> clientDisplays =
                 new ArrayList<>(displays.size());
 
         try {
@@ -1091,20 +1105,23 @@ public final class DisplayPreviewV2Manager {
                 int entityId =
                         allocatePacketEntityId();
 
-                entityIds.add(entityId);
-
-                sendClientDisplay(
-                        player,
-                        player.level(),
-                        entityId,
-                        display,
-                        config
+                clientDisplays.add(
+                        sendClientDisplay(
+                                player,
+                                player.level(),
+                                entityId,
+                                display,
+                                config,
+                                initialScale
+                        )
                 );
             }
         } catch (RuntimeException exception) {
             removeClientDisplays(
                     player,
-                    entityIds
+                    clientDisplays.stream()
+                            .map(ClientDisplay::entityId)
+                            .toList()
             );
 
             Bananaclaims.LOGGER.error(
@@ -1116,9 +1133,6 @@ public final class DisplayPreviewV2Manager {
             return false;
         }
 
-        long currentTick =
-                server.getTickCount();
-
         sessions.put(
                 player.getUUID(),
                 new DisplaySession(
@@ -1126,21 +1140,25 @@ public final class DisplayPreviewV2Manager {
                         player.level()
                                 .dimension()
                                 .toString(),
-                        List.copyOf(entityIds),
+                        clientDisplays,
+                        currentTick,
                         currentTick
-                                + config.getDurationTicks()
+                                + config.getDurationTicks(),
+                        animation,
+                        initialScale
                 )
         );
 
         return true;
     }
 
-    private void sendClientDisplay(
+    private ClientDisplay sendClientDisplay(
             ServerPlayer player,
             ServerLevel level,
             int entityId,
             PreviewDisplaySpec spec,
-            PreviewV2Config config
+            PreviewV2Config config,
+            float scaleMultiplier
     ) {
         Display.BlockDisplay display =
                 new Display.BlockDisplay(
@@ -1158,18 +1176,13 @@ public final class DisplayPreviewV2Manager {
         display.setBlockState(
                 spec.blockState()
         );
-        display.setTransformation(
-                new Transformation(
-                        new Vector3f(),
-                        new Quaternionf(),
-                        new Vector3f(
-                                spec.scaleX(),
-                                spec.scaleY(),
-                                spec.scaleZ()
-                        ),
-                        new Quaternionf()
-                )
+
+        applyAnimatedTransformation(
+                display,
+                spec,
+                scaleMultiplier
         );
+
         display.setViewRange(
                 config.getViewRange()
         );
@@ -1212,6 +1225,83 @@ public final class DisplayPreviewV2Manager {
                 )
         );
 
+        sendDisplayMetadata(
+                player,
+                entityId,
+                display
+        );
+
+        return new ClientDisplay(
+                entityId,
+                display,
+                spec
+        );
+    }
+
+    private static void updateClientDisplayScale(
+            ServerPlayer player,
+            ClientDisplay clientDisplay,
+            float scaleMultiplier
+    ) {
+        applyAnimatedTransformation(
+                clientDisplay.display(),
+                clientDisplay.spec(),
+                scaleMultiplier
+        );
+
+        sendDisplayMetadata(
+                player,
+                clientDisplay.entityId(),
+                clientDisplay.display()
+        );
+    }
+
+    private static void applyAnimatedTransformation(
+            Display.BlockDisplay display,
+            PreviewDisplaySpec spec,
+            float scaleMultiplier
+    ) {
+        float multiplier =
+                Math.max(
+                        0.001F,
+                        Math.min(1.0F, scaleMultiplier)
+                );
+
+        float scaledX =
+                spec.scaleX() * multiplier;
+
+        float scaledY =
+                spec.scaleY() * multiplier;
+
+        float scaledZ =
+                spec.scaleZ() * multiplier;
+
+        Vector3f centeredTranslation =
+                new Vector3f(
+                        (spec.scaleX() - scaledX) / 2.0F,
+                        (spec.scaleY() - scaledY) / 2.0F,
+                        (spec.scaleZ() - scaledZ) / 2.0F
+                );
+
+        display.setTransformation(
+                new Transformation(
+                        centeredTranslation,
+                        new Quaternionf(),
+                        new Vector3f(
+                                scaledX,
+                                scaledY,
+                                scaledZ
+                        ),
+                        new Quaternionf()
+                )
+        );
+    }
+
+    private static void sendDisplayMetadata(
+            ServerPlayer player,
+            int entityId,
+            Display.BlockDisplay display
+    ) {
         List<SynchedEntityData.DataValue<?>> packedData =
                 display.getEntityData()
                         .getNonDefaultValues();
@@ -1277,23 +1367,157 @@ public final class DisplayPreviewV2Manager {
             if (!currentDimension.equals(
                     session.dimension()
             )) {
-                // A client level change clears the packet-only entities.
+                // A client level change clears packet-only entities.
                 iterator.remove();
                 continue;
             }
 
             if (currentTick
-                    < session.expiryTick()) {
+                    >= session.expiryTick()) {
+                removeClientDisplays(
+                        player,
+                        session.entityIds()
+                );
+
+                iterator.remove();
                 continue;
             }
 
-            removeClientDisplays(
+            updateAnimationIfNeeded(
                     player,
-                    session.entityIds()
+                    session,
+                    currentTick
             );
-
-            iterator.remove();
         }
+    }
+
+    private static void updateAnimationIfNeeded(
+            ServerPlayer player,
+            DisplaySession session,
+            long currentTick
+    ) {
+        AnimationTimeline animation =
+                session.animation();
+
+        if (!animation.active()) {
+            return;
+        }
+
+        float targetScale =
+                calculateAnimationScale(
+                        session,
+                        currentTick
+                );
+
+        if (Math.abs(
+                targetScale - session.lastScale()
+        ) < ANIMATION_SCALE_EPSILON) {
+            return;
+        }
+
+        boolean reachedFadeInEnd =
+                animation.fadeInTicks() > 0
+                        && currentTick
+                        >= session.startTick()
+                        + animation.fadeInTicks()
+                        && session.lastScale() < 1.0F;
+
+        boolean reachedFadeOutEnd =
+                currentTick
+                        >= session.expiryTick() - 1L;
+
+        boolean updateIntervalElapsed =
+                currentTick
+                        - session.lastAnimationUpdateTick()
+                        >= animation.updateIntervalTicks();
+
+        if (!reachedFadeInEnd
+                && !reachedFadeOutEnd
+                && !updateIntervalElapsed) {
+            return;
+        }
+
+        for (ClientDisplay display : session.displays()) {
+            updateClientDisplayScale(
+                    player,
+                    display,
+                    targetScale
+            );
+        }
+
+        session.recordAnimationUpdate(
+                currentTick,
+                targetScale
+        );
+    }
+
+    private static float calculateAnimationScale(
+            DisplaySession session,
+            long currentTick
+    ) {
+        AnimationTimeline animation =
+                session.animation();
+
+        long elapsedTicks =
+                Math.max(
+                        0L,
+                        currentTick - session.startTick()
+                );
+
+        if (animation.fadeInTicks() > 0
+                && elapsedTicks
+                < animation.fadeInTicks()) {
+            float progress =
+                    (float) elapsedTicks
+                            / animation.fadeInTicks();
+
+            return interpolateFadeScale(
+                    animation.minimumScale(),
+                    progress
+            );
+        }
+
+        long remainingTicks =
+                Math.max(
+                        0L,
+                        session.expiryTick() - currentTick
+                );
+
+        if (animation.fadeOutTicks() > 0
+                && remainingTicks
+                <= animation.fadeOutTicks()) {
+            float progress =
+                    (float) remainingTicks
+                            / animation.fadeOutTicks();
+
+            return interpolateFadeScale(
+                    animation.minimumScale(),
+                    progress
+            );
+        }
+
+        return 1.0F;
+    }
+
+    private static float interpolateFadeScale(
+            float minimumScale,
+            float progress
+    ) {
+        float clampedProgress =
+                Math.max(
+                        0.0F,
+                        Math.min(1.0F, progress)
+                );
+
+        float smoothProgress =
+                clampedProgress
+                        * clampedProgress
+                        * (3.0F
+                        - 2.0F * clampedProgress);
+
+        return minimumScale
+                + (1.0F - minimumScale)
+                * smoothProgress;
     }
 
     private void removeExistingSession(
@@ -1398,23 +1622,216 @@ public final class DisplayPreviewV2Manager {
         }
     }
 
-    private record DisplaySession(
-            MinecraftServer server,
-            String dimension,
-            List<Integer> entityIds,
-            long expiryTick
+    private record ClientDisplay(
+            int entityId,
+            Display.BlockDisplay display,
+            PreviewDisplaySpec spec
     ) {
-        private DisplaySession {
+        private ClientDisplay {
             Objects.requireNonNull(
-                    server,
-                    "server"
+                    display,
+                    "display"
             );
             Objects.requireNonNull(
-                    dimension,
-                    "dimension"
+                    spec,
+                    "spec"
             );
-            entityIds =
-                    List.copyOf(entityIds);
+        }
+    }
+
+    private record AnimationTimeline(
+            int fadeInTicks,
+            int fadeOutTicks,
+            int updateIntervalTicks,
+            float minimumScale
+    ) {
+        private static AnimationTimeline resolve(
+                PreviewV2Config config
+        ) {
+            PreviewV2Config.AnimationSettings animations =
+                    config.getAnimations();
+
+            if (!animations.isFadeEnabled()) {
+                return new AnimationTimeline(
+                        0,
+                        0,
+                        animations.getFadeUpdateIntervalTicks(),
+                        animations.getFadeMinimumScale()
+                );
+            }
+
+            int durationTicks =
+                    Math.max(
+                            1,
+                            config.getDurationTicks()
+                    );
+
+            int fadeInTicks =
+                    Math.max(
+                            0,
+                            animations.getFadeInTicks()
+                    );
+
+            int fadeOutTicks =
+                    Math.max(
+                            0,
+                            animations.getFadeOutTicks()
+                    );
+
+            int combinedFadeTicks =
+                    fadeInTicks + fadeOutTicks;
+
+            if (combinedFadeTicks > durationTicks) {
+                if (fadeInTicks == 0) {
+                    fadeOutTicks = durationTicks;
+                } else if (fadeOutTicks == 0) {
+                    fadeInTicks = durationTicks;
+                } else if (durationTicks == 1) {
+                    fadeInTicks = 1;
+                    fadeOutTicks = 0;
+                } else {
+                    double fadeInRatio =
+                            (double) fadeInTicks
+                                    / combinedFadeTicks;
+
+                    fadeInTicks =
+                            Math.max(
+                                    1,
+                                    Math.min(
+                                            durationTicks - 1,
+                                            (int) Math.round(
+                                                    durationTicks
+                                                            * fadeInRatio
+                                            )
+                                    )
+                            );
+
+                    fadeOutTicks =
+                            durationTicks - fadeInTicks;
+                }
+            }
+
+            return new AnimationTimeline(
+                    fadeInTicks,
+                    fadeOutTicks,
+                    animations.getFadeUpdateIntervalTicks(),
+                    animations.getFadeMinimumScale()
+            );
+        }
+
+        private boolean active() {
+            return fadeInTicks > 0
+                    || fadeOutTicks > 0;
+        }
+    }
+
+    private static final class DisplaySession {
+
+        private final MinecraftServer server;
+        private final String dimension;
+        private final List<ClientDisplay> displays;
+        private final List<Integer> entityIds;
+        private final long startTick;
+        private final long expiryTick;
+        private final AnimationTimeline animation;
+
+        private long lastAnimationUpdateTick;
+        private float lastScale;
+
+        private DisplaySession(
+                MinecraftServer server,
+                String dimension,
+                List<ClientDisplay> displays,
+                long startTick,
+                long expiryTick,
+                AnimationTimeline animation,
+                float initialScale
+        ) {
+            this.server =
+                    Objects.requireNonNull(
+                            server,
+                            "server"
+                    );
+
+            this.dimension =
+                    Objects.requireNonNull(
+                            dimension,
+                            "dimension"
+                    );
+
+            this.displays =
+                    List.copyOf(displays);
+
+            this.entityIds =
+                    this.displays.stream()
+                            .map(ClientDisplay::entityId)
+                            .toList();
+
+            this.startTick =
+                    startTick;
+
+            this.expiryTick =
+                    expiryTick;
+
+            this.animation =
+                    Objects.requireNonNull(
+                            animation,
+                            "animation"
+                    );
+
+            this.lastAnimationUpdateTick =
+                    startTick;
+
+            this.lastScale =
+                    initialScale;
+        }
+
+        private MinecraftServer server() {
+            return server;
+        }
+
+        private String dimension() {
+            return dimension;
+        }
+
+        private List<ClientDisplay> displays() {
+            return displays;
+        }
+
+        private List<Integer> entityIds() {
+            return entityIds;
+        }
+
+        private long startTick() {
+            return startTick;
+        }
+
+        private long expiryTick() {
+            return expiryTick;
+        }
+
+        private AnimationTimeline animation() {
+            return animation;
+        }
+
+        private long lastAnimationUpdateTick() {
+            return lastAnimationUpdateTick;
+        }
+
+        private float lastScale() {
+            return lastScale;
+        }
+
+        private void recordAnimationUpdate(
+                long updateTick,
+                float scale
+        ) {
+            lastAnimationUpdateTick =
+                    updateTick;
+
+            lastScale =
+                    scale;
         }
     }
 }
+

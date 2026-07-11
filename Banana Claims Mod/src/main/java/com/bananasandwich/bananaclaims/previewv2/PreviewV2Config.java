@@ -11,7 +11,7 @@ import java.util.Locale;
  */
 public final class PreviewV2Config {
 
-    public static final int CURRENT_CONFIG_VERSION = 2;
+    public static final int CURRENT_CONFIG_VERSION = 3;
 
     public static final String DEFAULT_GLOW_COLOR =
             "#A855F7";
@@ -101,6 +101,9 @@ public final class PreviewV2Config {
     boolean sanitize() {
         boolean changed = false;
 
+        int previousConfigVersion =
+                configVersion;
+
         if (configVersion != CURRENT_CONFIG_VERSION) {
             configVersion = CURRENT_CONFIG_VERSION;
             changed = true;
@@ -180,6 +183,10 @@ public final class PreviewV2Config {
         if (animations == null) {
             animations = new AnimationSettings();
             changed = true;
+        }
+
+        if (previousConfigVersion < 3) {
+            changed |= animations.applyVersion3Defaults();
         }
 
         changed |= border.sanitize();
@@ -695,8 +702,10 @@ public final class PreviewV2Config {
     public static final class AnimationSettings {
 
         private boolean fadeEnabled = false;
-        private int fadeInTicks = 0;
-        private int fadeOutTicks = 0;
+        private int fadeInTicks = 10;
+        private int fadeOutTicks = 10;
+        private int fadeUpdateIntervalTicks = 1;
+        private float fadeMinimumScale = 0.05F;
         private boolean pulseEnabled = false;
         private int pulsePeriodTicks = 20;
         private float pulseMinimumScale = 0.90F;
@@ -708,11 +717,25 @@ public final class PreviewV2Config {
             copy.fadeEnabled = fadeEnabled;
             copy.fadeInTicks = fadeInTicks;
             copy.fadeOutTicks = fadeOutTicks;
+            copy.fadeUpdateIntervalTicks = fadeUpdateIntervalTicks;
+            copy.fadeMinimumScale = fadeMinimumScale;
             copy.pulseEnabled = pulseEnabled;
             copy.pulsePeriodTicks = pulsePeriodTicks;
             copy.pulseMinimumScale = pulseMinimumScale;
 
             return copy;
+        }
+
+        private boolean applyVersion3Defaults() {
+            if (!fadeEnabled
+                    && fadeInTicks == 0
+                    && fadeOutTicks == 0) {
+                fadeInTicks = 10;
+                fadeOutTicks = 10;
+                return true;
+            }
+
+            return false;
         }
 
         private boolean sanitize() {
@@ -727,6 +750,26 @@ public final class PreviewV2Config {
                     clamp(fadeOutTicks, 0, 20 * 60 * 30);
             changed |= sanitizedFadeOutTicks != fadeOutTicks;
             fadeOutTicks = sanitizedFadeOutTicks;
+
+            int sanitizedFadeUpdateIntervalTicks =
+                    clamp(fadeUpdateIntervalTicks, 1, 20);
+            changed |= sanitizedFadeUpdateIntervalTicks
+                    != fadeUpdateIntervalTicks;
+            fadeUpdateIntervalTicks =
+                    sanitizedFadeUpdateIntervalTicks;
+
+            float sanitizedFadeMinimumScale =
+                    finiteFloat(
+                            fadeMinimumScale,
+                            0.05F,
+                            0.001F,
+                            1.0F
+                    );
+            changed |= Float.compare(
+                    sanitizedFadeMinimumScale,
+                    fadeMinimumScale
+            ) != 0;
+            fadeMinimumScale = sanitizedFadeMinimumScale;
 
             int sanitizedPulsePeriodTicks =
                     clamp(pulsePeriodTicks, 1, 20 * 60 * 30);
@@ -771,6 +814,28 @@ public final class PreviewV2Config {
 
         public void setFadeOutTicks(int fadeOutTicks) {
             this.fadeOutTicks = fadeOutTicks;
+        }
+
+        public int getFadeUpdateIntervalTicks() {
+            return fadeUpdateIntervalTicks;
+        }
+
+        public void setFadeUpdateIntervalTicks(
+                int fadeUpdateIntervalTicks
+        ) {
+            this.fadeUpdateIntervalTicks =
+                    fadeUpdateIntervalTicks;
+        }
+
+        public float getFadeMinimumScale() {
+            return fadeMinimumScale;
+        }
+
+        public void setFadeMinimumScale(
+                float fadeMinimumScale
+        ) {
+            this.fadeMinimumScale =
+                    fadeMinimumScale;
         }
 
         public boolean isPulseEnabled() {
@@ -903,5 +968,8 @@ public final class PreviewV2Config {
         );
     }
 }
+
+
+
 
 
