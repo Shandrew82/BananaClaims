@@ -1,4 +1,3 @@
-// Banana Claims Renderer Compile Fix v4 - mapping-safe cleanup
 package com.bananasandwich.bananaclaims.previewv2;
 
 import com.bananasandwich.bananaclaims.Bananaclaims;
@@ -9,6 +8,10 @@ import com.mojang.math.Transformation;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
+import net.minecraft.network.protocol.game.ClientboundRemoveEntitiesPacket;
+import net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket;
+import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -34,10 +37,19 @@ import java.util.UUID;
 
 public final class DisplayPreviewV2Manager {
 
+    /**
+     * Packet-only entity IDs are deliberately kept far above normal server
+     * entity IDs. They only exist in the receiving player's client world.
+     */
+    private static final int PACKET_ENTITY_ID_FLOOR =
+            1_500_000_000;
+
     private final PreviewV2ConfigManager configManager;
 
     private final Map<UUID, DisplaySession> sessions =
             new HashMap<>();
+
+    private int nextPacketEntityId = Integer.MAX_VALUE;
 
     private boolean registered;
 
@@ -81,8 +93,14 @@ public final class DisplayPreviewV2Manager {
             return false;
         }
 
-        discardAll(
-                existing.displays()
+        ServerPlayer player =
+                existing.server()
+                        .getPlayerList()
+                        .getPlayer(playerUuid);
+
+        removeClientDisplays(
+                player,
+                existing.entityIds()
         );
 
         return true;
@@ -134,7 +152,7 @@ public final class DisplayPreviewV2Manager {
                 player.getUUID()
         );
 
-        List<Display.BlockDisplay> displays =
+        List<PreviewDisplaySpec> displays =
                 new ArrayList<>();
 
         for (PerimeterEdge edge : perimeterEdges) {
@@ -182,7 +200,6 @@ public final class DisplayPreviewV2Manager {
                 server,
                 displays,
                 context.config()
-                        .getDurationTicks()
         );
     }
 
@@ -354,7 +371,7 @@ public final class DisplayPreviewV2Manager {
                 player.getUUID()
         );
 
-        List<Display.BlockDisplay> displays =
+        List<PreviewDisplaySpec> displays =
                 new ArrayList<>();
 
         appendContouredXEdge(
@@ -449,13 +466,12 @@ public final class DisplayPreviewV2Manager {
                 server,
                 displays,
                 context.config()
-                        .getDurationTicks()
         );
     }
 
     private static void appendContouredXEdge(
             ServerLevel level,
-            List<Display.BlockDisplay> displays,
+            List<PreviewDisplaySpec> displays,
             int minX,
             int maxX,
             int z,
@@ -504,7 +520,6 @@ public final class DisplayPreviewV2Manager {
                             : x;
 
             addDisplay(
-                    level,
                     displays,
                     runStartX,
                     runHeight
@@ -527,7 +542,7 @@ public final class DisplayPreviewV2Manager {
 
     private static void appendContouredZEdge(
             ServerLevel level,
-            List<Display.BlockDisplay> displays,
+            List<PreviewDisplaySpec> displays,
             int minZ,
             int maxZ,
             int x,
@@ -576,7 +591,6 @@ public final class DisplayPreviewV2Manager {
                             : z;
 
             addDisplay(
-                    level,
                     displays,
                     x
                             - border.getThickness() / 2.0D,
@@ -650,8 +664,7 @@ public final class DisplayPreviewV2Manager {
     }
 
     private static void addDisplay(
-            ServerLevel level,
-            List<Display.BlockDisplay> displays,
+            List<PreviewDisplaySpec> displays,
             double x,
             double y,
             double z,
@@ -668,72 +681,24 @@ public final class DisplayPreviewV2Manager {
             return;
         }
 
-        Display.BlockDisplay display =
-                new Display.BlockDisplay(
-                        EntityTypes.BLOCK_DISPLAY,
-                        level
-                );
-
-        display.setPos(
-                x,
-                y,
-                z
-        );
-
-        display.setBlockState(blockState);
-
-        display.setTransformation(
-                new Transformation(
-                        new Vector3f(),
-                        new Quaternionf(),
-                        new Vector3f(
-                                scaleX,
-                                scaleY,
-                                scaleZ
-                        ),
-                        new Quaternionf()
-                )
-        );
-
-        display.setViewRange(
-                config.getViewRange()
-        );
-        display.setShadowRadius(
-                config.getShadowRadius()
-        );
-        display.setShadowStrength(
-                config.getShadowStrength()
-        );
-        display.setWidth(
-                Math.max(
+        displays.add(
+                new PreviewDisplaySpec(
+                        x,
+                        y,
+                        z,
                         scaleX,
-                        scaleZ
+                        scaleY,
+                        scaleZ,
+                        blockState,
+                        config.isGlowEnabled()
+                                && glowEnabled
                 )
         );
-        display.setHeight(scaleY);
-        display.setGlowingTag(
-                config.isGlowEnabled()
-                        && glowEnabled
-        );
-        display.setGlowColorOverride(
-                config.getGlowColorRgb()
-        );
-        display.setNoGravity(true);
-
-        boolean added =
-                level.addFreshEntity(display);
-
-        if (!added) {
-            display.discard();
-            return;
-        }
-
-        displays.add(display);
     }
 
     private static void appendGuideColumns(
             ServerLevel level,
-            List<Display.BlockDisplay> displays,
+            List<PreviewDisplaySpec> displays,
             List<PerimeterEdge> edges,
             Set<PerimeterPoint> cornerPoints,
             RenderContext context
@@ -796,7 +761,7 @@ public final class DisplayPreviewV2Manager {
 
     private static void appendFullHeightGuideColumn(
             ServerLevel level,
-            List<Display.BlockDisplay> displays,
+            List<PreviewDisplaySpec> displays,
             PerimeterPoint point,
             RenderContext context
     ) {
@@ -829,7 +794,6 @@ public final class DisplayPreviewV2Manager {
                 );
 
         addDisplay(
-                level,
                 displays,
                 point.x()
                         - guides.getWidth() / 2.0D,
@@ -857,7 +821,6 @@ public final class DisplayPreviewV2Manager {
                 );
 
         addDisplay(
-                level,
                 displays,
                 point.x()
                         - guides.getWidth() / 2.0D,
@@ -876,7 +839,7 @@ public final class DisplayPreviewV2Manager {
 
     private static void appendCornerAnchors(
             ServerLevel level,
-            List<Display.BlockDisplay> displays,
+            List<PreviewDisplaySpec> displays,
             Set<PerimeterPoint> corners,
             RenderContext context
     ) {
@@ -899,7 +862,6 @@ public final class DisplayPreviewV2Manager {
                     );
 
             addDisplay(
-                    level,
                     displays,
                     corner.x()
                             - cornerSettings.getSize() / 2.0D,
@@ -933,7 +895,6 @@ public final class DisplayPreviewV2Manager {
                     );
 
             addDisplay(
-                    level,
                     displays,
                     corner.x()
                             - cornerSettings.getColumnThickness()
@@ -963,7 +924,6 @@ public final class DisplayPreviewV2Manager {
                     );
 
             addDisplay(
-                    level,
                     displays,
                     corner.x()
                             - cornerSettings.getColumnThickness()
@@ -1107,22 +1067,52 @@ public final class DisplayPreviewV2Manager {
     private void discardAllSessions(
             MinecraftServer server
     ) {
-        for (DisplaySession session : sessions.values()) {
-            discardAll(
-                    session.displays()
-            );
-        }
-
+        // Packet-only displays are owned by each connected client. Closing the
+        // connection clears them automatically, so shutdown only drops the
+        // server-side bookkeeping.
         sessions.clear();
     }
 
     private boolean startSession(
             ServerPlayer player,
             MinecraftServer server,
-            List<Display.BlockDisplay> displays,
-            int durationTicks
+            List<PreviewDisplaySpec> displays,
+            PreviewV2Config config
     ) {
         if (displays.isEmpty()) {
+            return false;
+        }
+
+        List<Integer> entityIds =
+                new ArrayList<>(displays.size());
+
+        try {
+            for (PreviewDisplaySpec display : displays) {
+                int entityId =
+                        allocatePacketEntityId();
+
+                entityIds.add(entityId);
+
+                sendClientDisplay(
+                        player,
+                        player.level(),
+                        entityId,
+                        display,
+                        config
+                );
+            }
+        } catch (RuntimeException exception) {
+            removeClientDisplays(
+                    player,
+                    entityIds
+            );
+
+            Bananaclaims.LOGGER.error(
+                    "Failed to send Renderer V2 packet display to '{}'.",
+                    player.getScoreboardName(),
+                    exception
+            );
+
             return false;
         }
 
@@ -1132,13 +1122,121 @@ public final class DisplayPreviewV2Manager {
         sessions.put(
                 player.getUUID(),
                 new DisplaySession(
-                        List.copyOf(displays),
+                        server,
+                        player.level()
+                                .dimension()
+                                .toString(),
+                        List.copyOf(entityIds),
                         currentTick
-                                + durationTicks
+                                + config.getDurationTicks()
                 )
         );
 
         return true;
+    }
+
+    private void sendClientDisplay(
+            ServerPlayer player,
+            ServerLevel level,
+            int entityId,
+            PreviewDisplaySpec spec,
+            PreviewV2Config config
+    ) {
+        Display.BlockDisplay display =
+                new Display.BlockDisplay(
+                        EntityTypes.BLOCK_DISPLAY,
+                        level
+                );
+
+        display.setId(entityId);
+        display.setUUID(UUID.randomUUID());
+        display.setPos(
+                spec.x(),
+                spec.y(),
+                spec.z()
+        );
+        display.setBlockState(
+                spec.blockState()
+        );
+        display.setTransformation(
+                new Transformation(
+                        new Vector3f(),
+                        new Quaternionf(),
+                        new Vector3f(
+                                spec.scaleX(),
+                                spec.scaleY(),
+                                spec.scaleZ()
+                        ),
+                        new Quaternionf()
+                )
+        );
+        display.setViewRange(
+                config.getViewRange()
+        );
+        display.setShadowRadius(
+                config.getShadowRadius()
+        );
+        display.setShadowStrength(
+                config.getShadowStrength()
+        );
+        display.setWidth(
+                Math.max(
+                        spec.scaleX(),
+                        spec.scaleZ()
+                )
+        );
+        display.setHeight(
+                spec.scaleY()
+        );
+        display.setGlowingTag(
+                spec.glowEnabled()
+        );
+        display.setGlowColorOverride(
+                config.getGlowColorRgb()
+        );
+        display.setNoGravity(true);
+
+        player.connection.send(
+                new ClientboundAddEntityPacket(
+                        display.getId(),
+                        display.getUUID(),
+                        spec.x(),
+                        spec.y(),
+                        spec.z(),
+                        0.0F,
+                        0.0F,
+                        EntityTypes.BLOCK_DISPLAY,
+                        0,
+                        Vec3.ZERO,
+                        0.0D
+                )
+        );
+
+        List<SynchedEntityData.DataValue<?>> packedData =
+                display.getEntityData()
+                        .getNonDefaultValues();
+
+        if (packedData == null
+                || packedData.isEmpty()) {
+            return;
+        }
+
+        player.connection.send(
+                new ClientboundSetEntityDataPacket(
+                        entityId,
+                        packedData
+                )
+        );
+    }
+
+    private int allocatePacketEntityId() {
+        if (nextPacketEntityId
+                <= PACKET_ENTITY_ID_FLOOR) {
+            nextPacketEntityId =
+                    Integer.MAX_VALUE;
+        }
+
+        return nextPacketEntityId--;
     }
 
     private void tick(
@@ -1162,13 +1260,36 @@ public final class DisplayPreviewV2Manager {
             DisplaySession session =
                     entry.getValue();
 
+            ServerPlayer player =
+                    server.getPlayerList()
+                            .getPlayer(entry.getKey());
+
+            if (player == null) {
+                iterator.remove();
+                continue;
+            }
+
+            String currentDimension =
+                    player.level()
+                            .dimension()
+                            .toString();
+
+            if (!currentDimension.equals(
+                    session.dimension()
+            )) {
+                // A client level change clears the packet-only entities.
+                iterator.remove();
+                continue;
+            }
+
             if (currentTick
                     < session.expiryTick()) {
                 continue;
             }
 
-            discardAll(
-                    session.displays()
+            removeClientDisplays(
+                    player,
+                    session.entityIds()
             );
 
             iterator.remove();
@@ -1185,24 +1306,42 @@ public final class DisplayPreviewV2Manager {
             return;
         }
 
-        discardAll(
-                existing.displays()
+        ServerPlayer player =
+                existing.server()
+                        .getPlayerList()
+                        .getPlayer(playerUuid);
+
+        removeClientDisplays(
+                player,
+                existing.entityIds()
         );
     }
 
-    private static void discardAll(
-            List<Display.BlockDisplay> displays
+    private static void removeClientDisplays(
+            ServerPlayer player,
+            List<Integer> entityIds
     ) {
-        if (displays == null) {
+        if (player == null
+                || entityIds == null
+                || entityIds.isEmpty()) {
             return;
         }
 
-        for (Display.BlockDisplay display : displays) {
-            if (display != null
-                    && !display.isRemoved()) {
-                display.discard();
-            }
+        int[] packedIds =
+                new int[entityIds.size()];
+
+        for (int index = 0;
+             index < entityIds.size();
+             index++) {
+            packedIds[index] =
+                    entityIds.get(index);
         }
+
+        player.connection.send(
+                new ClientboundRemoveEntitiesPacket(
+                        packedIds
+                )
+        );
     }
 
     private record RenderContext(
@@ -1241,12 +1380,41 @@ public final class DisplayPreviewV2Manager {
         }
     }
 
+    private record PreviewDisplaySpec(
+            double x,
+            double y,
+            double z,
+            float scaleX,
+            float scaleY,
+            float scaleZ,
+            BlockState blockState,
+            boolean glowEnabled
+    ) {
+        private PreviewDisplaySpec {
+            Objects.requireNonNull(
+                    blockState,
+                    "blockState"
+            );
+        }
+    }
+
     private record DisplaySession(
-            List<Display.BlockDisplay> displays,
+            MinecraftServer server,
+            String dimension,
+            List<Integer> entityIds,
             long expiryTick
     ) {
         private DisplaySession {
-            displays = List.copyOf(displays);
+            Objects.requireNonNull(
+                    server,
+                    "server"
+            );
+            Objects.requireNonNull(
+                    dimension,
+                    "dimension"
+            );
+            entityIds =
+                    List.copyOf(entityIds);
         }
     }
 }
