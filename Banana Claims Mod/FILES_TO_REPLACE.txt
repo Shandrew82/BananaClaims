@@ -1,26 +1,45 @@
-BANANA CLAIMS — CONFIGURATION AND PERMISSIONS
-
 REPLACE
-src/main/java/com/bananasandwich/bananaclaims/Bananaclaims.java
-src/main/java/com/bananasandwich/bananaclaims/command/ClaimCommand.java
-src/main/java/com/bananasandwich/bananaclaims/command/admin/AdminClaimCommand.java
-src/main/java/com/bananasandwich/bananaclaims/command/admin/AdminClaimPermission.java
-src/main/java/com/bananasandwich/bananaclaims/protection/ClaimProtectionManager.java
-src/main/java/com/bananasandwich/bananaclaims/protection/ClaimProtectionService.java
-src/main/java/com/bananasandwich/bananaclaims/protection/ProtectionAction.java
+README.md
+PERMISSIONS.md
 src/main/resources/fabric.mod.json
+src/main/resources/assets/bananaclaims/lang/en_us.json
+src/main/java/com/bananasandwich/bananaclaims/Bananaclaims.java
+src/main/java/com/bananasandwich/bananaclaims/Claim/ClaimFlagDefinition.java
+src/main/java/com/bananasandwich/bananaclaims/command/ClaimCommand.java
+src/main/java/com/bananasandwich/bananaclaims/command/CreateAreaClaimCommand.java
+src/main/java/com/bananasandwich/bananaclaims/command/CreateClaimCommand.java
+src/main/java/com/bananasandwich/bananaclaims/command/DeleteClaimCommand.java
+src/main/java/com/bananasandwich/bananaclaims/command/DescriptionClaimCommand.java
+src/main/java/com/bananasandwich/bananaclaims/command/ExpandClaimCommand.java
+src/main/java/com/bananasandwich/bananaclaims/command/FlagClaimCommand.java
+src/main/java/com/bananasandwich/bananaclaims/command/InfoClaimCommand.java
+src/main/java/com/bananasandwich/bananaclaims/command/LeaveClaimCommand.java
+src/main/java/com/bananasandwich/bananaclaims/command/ListClaimCommand.java
+src/main/java/com/bananasandwich/bananaclaims/command/PopupClaimCommand.java
+src/main/java/com/bananasandwich/bananaclaims/command/PreviewClaimCommand.java
+src/main/java/com/bananasandwich/bananaclaims/command/RenameClaimCommand.java
+src/main/java/com/bananasandwich/bananaclaims/command/SelectionClaimCommand.java
+src/main/java/com/bananasandwich/bananaclaims/command/ShrinkClaimCommand.java
+src/main/java/com/bananasandwich/bananaclaims/command/TransferClaimCommand.java
+src/main/java/com/bananasandwich/bananaclaims/command/admin/AdminClaimPermission.java
+src/main/java/com/bananasandwich/bananaclaims/command/member/AddMemberCommand.java
+src/main/java/com/bananasandwich/bananaclaims/command/member/ListMemberCommand.java
+src/main/java/com/bananasandwich/bananaclaims/command/member/RemoveMemberCommand.java
+src/main/java/com/bananasandwich/bananaclaims/command/subowner/AddSubOwnerCommand.java
+src/main/java/com/bananasandwich/bananaclaims/command/subowner/ListSubOwnerCommand.java
+src/main/java/com/bananasandwich/bananaclaims/command/subowner/RemoveSubOwnerCommand.java
+src/main/java/com/bananasandwich/bananaclaims/integration/bluemap/BlueMapBridge.java
+src/main/java/com/bananasandwich/bananaclaims/protection/ProtectionAction.java
+src/main/java/com/bananasandwich/bananaclaims/storage/ClaimStorage.java
 
 ADD
-src/main/java/com/bananasandwich/bananaclaims/config/BananaClaimsConfig.java
-src/main/java/com/bananasandwich/bananaclaims/config/BananaClaimsConfigManager.java
-src/main/java/com/bananasandwich/bananaclaims/permission/ClaimPermission.java
-src/main/java/com/bananasandwich/bananaclaims/permission/ClaimPermissionService.java
-src/main/java/com/bananasandwich/bananaclaims/permission/FabricPermissionsBridge.java
-src/main/resources/assets/bananaclaims/lang/en_us.json
-PERMISSIONS.md
-
-REFERENCE / AUTO-GENERATED AT RUNTIME
-config/bananaclaims.json
-
-The mod automatically creates config/bananaclaims.json if it does not exist.
-Do not overwrite a customized live server config unless you intend to reset it to the supplied defaults.
+COMMANDS.md
+FLAGS.md
+CONFIGURATION.md
+PERFORMANCE.md
+RELEASE_CHECKLIST.md
+CHANGELOG.md
+DEVELOPMENT.md
+config/bananaclaims-preview.json
+src/main/java/com/bananasandwich/bananaclaims/Claim/ClaimSubOwner.java
+src/main/java/com/bananasandwich/bananaclaims/localization/BananaClaimsMessages.java

@@ -1,5 +1,7 @@
 package com.bananasandwich.bananaclaims.command;
 
+import com.bananasandwich.bananaclaims.localization.BananaClaimsMessages;
+
 import com.bananasandwich.bananaclaims.Bananaclaims;
 import com.bananasandwich.bananaclaims.claim.Claim;
 import com.bananasandwich.bananaclaims.selection.ClaimSelection;
@@ -9,7 +11,6 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 public class CreateAreaClaimCommand {
@@ -35,14 +36,14 @@ public class CreateAreaClaimCommand {
 
         if (selection == null || !selection.hasBothPositions()) {
             source.sendFailure(
-                    Component.literal("You must set both claim positions first.")
+                    BananaClaimsMessages.text("command.bananaclaims.createarea.positions_required")
             );
             return 0;
         }
 
         if (!selection.isSameDimension()) {
             source.sendFailure(
-                    Component.literal("Both claim positions must be in the same dimension.")
+                    BananaClaimsMessages.text("command.bananaclaims.createarea.same_dimension")
             );
             return 0;
         }
@@ -54,7 +55,7 @@ public class CreateAreaClaimCommand {
 
         if (duplicateName) {
             source.sendFailure(
-                    Component.literal("A claim named \"" + claimName + "\" already exists.")
+                    BananaClaimsMessages.text("command.bananaclaims.createarea.duplicate_name", claimName)
             );
             return 0;
         }
@@ -86,9 +87,7 @@ public class CreateAreaClaimCommand {
                         chunkZ
                 )) {
                     source.sendFailure(
-                            Component.literal(
-                                    "The selected area contains already claimed chunks."
-                            )
+                            BananaClaimsMessages.text("command.bananaclaims.createarea.overlap")
                     );
                     return 0;
                 }
@@ -114,7 +113,7 @@ public class CreateAreaClaimCommand {
 
         if (!created) {
             source.sendFailure(
-                    Component.literal("The selected area could not be claimed.")
+                    BananaClaimsMessages.text("command.bananaclaims.createarea.failed")
             );
             return 0;
         }
@@ -123,10 +122,7 @@ public class CreateAreaClaimCommand {
         Bananaclaims.DISPLAY_PREVIEW_V2_MANAGER.stop(player.getUUID());
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "Created claim \"" + claimName + "\" with "
-                                + chunkCount + " chunks."
-                ),
+                () -> BananaClaimsMessages.text("command.bananaclaims.createarea.success", claimName, chunkCount),
                 false
         );
 

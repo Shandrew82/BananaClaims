@@ -1,5 +1,7 @@
 package com.bananasandwich.bananaclaims.command;
 
+import com.bananasandwich.bananaclaims.localization.BananaClaimsMessages;
+
 import com.bananasandwich.bananaclaims.claim.Claim;
 import com.bananasandwich.bananaclaims.claim.ClaimMember;
 import com.bananasandwich.bananaclaims.claim.ClaimSubOwner;
@@ -7,7 +9,6 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.Component;
 
 import java.util.List;
 import java.util.Optional;
@@ -48,9 +49,7 @@ public class InfoClaimCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendSuccess(
-                    () -> Component.literal(
-                            "You are standing in Wilderness."
-                    ),
+                    () -> BananaClaimsMessages.text("command.bananaclaims.info.wilderness"),
                     false
             );
 
@@ -74,11 +73,7 @@ public class InfoClaimCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "No claim found named \""
-                                    + claimName
-                                    + "\"."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.no_claim_named", claimName)
             );
 
             return 0;
@@ -98,7 +93,9 @@ public class InfoClaimCommand {
     ) {
         String description =
                 claim.getDescription().isBlank()
-                        ? "No description."
+                        ? BananaClaimsMessages.string(
+                        "command.bananaclaims.info.no_description"
+                )
                         : claim.getDescription();
 
         List<String> subOwnerNames =
@@ -114,7 +111,9 @@ public class InfoClaimCommand {
 
         String subOwnersText =
                 subOwnerNames.isEmpty()
-                        ? "None"
+                        ? BananaClaimsMessages.string(
+                        "command.bananaclaims.info.none"
+                )
                         : String.join(", ", subOwnerNames);
 
         List<String> memberNames =
@@ -130,28 +129,13 @@ public class InfoClaimCommand {
 
         String membersText =
                 memberNames.isEmpty()
-                        ? "None"
+                        ? BananaClaimsMessages.string(
+                        "command.bananaclaims.info.none"
+                )
                         : String.join(", ", memberNames);
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "Claim: "
-                                + claim.getName()
-                                + "\nOwner: "
-                                + claim.getOwnerName()
-                                + "\nSubowners ("
-                                + subOwnerNames.size()
-                                + "): "
-                                + subOwnersText
-                                + "\nMembers ("
-                                + memberNames.size()
-                                + "): "
-                                + membersText
-                                + "\nDescription: "
-                                + description
-                                + "\nChunks: "
-                                + claim.getChunks().size()
-                ),
+                () -> BananaClaimsMessages.text("command.bananaclaims.info.summary", claim.getName(), claim.getOwnerName(), subOwnerNames.size(), subOwnersText, memberNames.size(), membersText, description, claim.getChunks().size()),
                 false
         );
     }

@@ -1,5 +1,7 @@
 package com.bananasandwich.bananaclaims.command;
 
+import com.bananasandwich.bananaclaims.localization.BananaClaimsMessages;
+
 import com.bananasandwich.bananaclaims.Bananaclaims;
 import com.bananasandwich.bananaclaims.claim.Claim;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -7,7 +9,6 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Optional;
@@ -43,9 +44,7 @@ public class DescriptionClaimCommand {
 
         if (trimmedInput.isBlank()) {
             source.sendFailure(
-                    Component.literal(
-                            "You must provide a description."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.description.required")
             );
 
             return 0;
@@ -81,11 +80,7 @@ public class DescriptionClaimCommand {
 
         if (currentClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "There is no claim here. "
-                                    + "To update a claim remotely, use "
-                                    + "/claim description <claim> <description>."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.description.no_claim_here_hint")
             );
 
             return 0;
@@ -95,9 +90,7 @@ public class DescriptionClaimCommand {
 
         if (!claim.canManage(player.getUUID())) {
             source.sendFailure(
-                    Component.literal(
-                            "You cannot manage this claim."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.cannot_manage")
             );
 
             return 0;
@@ -119,11 +112,7 @@ public class DescriptionClaimCommand {
         Bananaclaims.CLAIM_MANAGER.saveClaims();
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "Updated the description for claim \""
-                                + claim.getName()
-                                + "\"."
-                ),
+                () -> BananaClaimsMessages.text("command.bananaclaims.description.success", claim.getName()),
                 false
         );
 

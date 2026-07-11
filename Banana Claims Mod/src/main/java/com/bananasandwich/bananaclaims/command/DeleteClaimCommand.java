@@ -1,5 +1,7 @@
 package com.bananasandwich.bananaclaims.command;
 
+import com.bananasandwich.bananaclaims.localization.BananaClaimsMessages;
+
 import com.bananasandwich.bananaclaims.Bananaclaims;
 import com.bananasandwich.bananaclaims.claim.Claim;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -7,7 +9,6 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Optional;
@@ -51,9 +52,7 @@ public class DeleteClaimCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "There is no claim here."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.no_claim_here")
             );
 
             return 0;
@@ -63,9 +62,7 @@ public class DeleteClaimCommand {
 
         if (!claim.isOwner(player.getUUID())) {
             source.sendFailure(
-                    Component.literal(
-                            "You do not own this claim."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.not_owner")
             );
 
             return 0;
@@ -92,11 +89,7 @@ public class DeleteClaimCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "You do not own a claim named \""
-                                    + claimName
-                                    + "\"."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.not_owner_named", claimName)
             );
 
             return 0;
@@ -123,22 +116,14 @@ public class DeleteClaimCommand {
 
         if (!removed) {
             source.sendFailure(
-                    Component.literal(
-                            "Unable to delete claim \""
-                                    + claimName
-                                    + "\"."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.delete.failed", claimName)
             );
 
             return 0;
         }
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "Claim \""
-                                + claimName
-                                + "\" deleted successfully."
-                ),
+                () -> BananaClaimsMessages.text("command.bananaclaims.delete.success", claimName),
                 false
         );
 

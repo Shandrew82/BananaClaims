@@ -2,8 +2,8 @@ package com.bananasandwich.bananaclaims.command.admin;
 
 import com.bananasandwich.bananaclaims.Bananaclaims;
 import com.bananasandwich.bananaclaims.permission.ClaimPermission;
+import com.bananasandwich.bananaclaims.localization.BananaClaimsMessages;
 import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.network.chat.Component;
 
 import java.util.function.IntSupplier;
 
@@ -81,9 +81,8 @@ public final class AdminClaimPermission {
     ) {
         if (!canUse(source, permission)) {
             source.sendFailure(
-                    Component.translatableWithFallback(
-                            "command.bananaclaims.permission_denied",
-                            "You do not have permission to use that Banana Claims command."
+                    BananaClaimsMessages.text(
+                            "command.bananaclaims.permission_denied"
                     )
             );
 

@@ -1,6 +1,7 @@
 package com.bananasandwich.bananaclaims.command.member;
 
 import com.bananasandwich.bananaclaims.Bananaclaims;
+import com.bananasandwich.bananaclaims.localization.BananaClaimsMessages;
 import com.bananasandwich.bananaclaims.claim.Claim;
 import com.bananasandwich.bananaclaims.claim.ClaimMutationResult;
 import com.bananasandwich.bananaclaims.command.ClaimResolver;
@@ -10,7 +11,6 @@ import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Optional;
@@ -74,9 +74,7 @@ public final class AddMemberCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "There is no claim here."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.no_claim_here")
             );
 
             return 0;
@@ -106,11 +104,7 @@ public final class AddMemberCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "You cannot manage a claim named \""
-                                    + claimName
-                                    + "\"."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.cannot_manage_named", claimName)
             );
 
             return 0;
@@ -144,11 +138,7 @@ public final class AddMemberCommand {
 
         if (optionalTarget.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "No online player found named \""
-                                    + playerName
-                                    + "\"."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.online_player_not_found", playerName)
             );
 
             return 0;
@@ -167,24 +157,12 @@ public final class AddMemberCommand {
         return switch (result) {
             case MEMBER_ADDED -> {
                 source.sendSuccess(
-                        () -> Component.literal(
-                                "Added "
-                                        + target.getName().getString()
-                                        + " as a member of claim \""
-                                        + claim.getName()
-                                        + "\"."
-                        ),
+                        () -> BananaClaimsMessages.text("command.bananaclaims.member.add.success_actor", target.getName().getString(), claim.getName()),
                         false
                 );
 
                 target.sendSystemMessage(
-                        Component.literal(
-                                "You were added as a member of claim \""
-                                        + claim.getName()
-                                        + "\" by "
-                                        + actor.getName().getString()
-                                        + "."
-                        )
+                        BananaClaimsMessages.text("command.bananaclaims.member.add.success_target", claim.getName(), actor.getName().getString())
                 );
 
                 yield 1;
@@ -192,10 +170,7 @@ public final class AddMemberCommand {
 
             case PLAYER_IS_OWNER -> {
                 source.sendFailure(
-                        Component.literal(
-                                target.getName().getString()
-                                        + " already owns this claim."
-                        )
+                        BananaClaimsMessages.text("command.bananaclaims.member.add.owner", target.getName().getString())
                 );
 
                 yield 0;
@@ -203,12 +178,7 @@ public final class AddMemberCommand {
 
             case PLAYER_IS_SUBOWNER -> {
                 source.sendFailure(
-                        Component.literal(
-                                target.getName().getString()
-                                        + " is already a subowner of claim \""
-                                        + claim.getName()
-                                        + "\"."
-                        )
+                        BananaClaimsMessages.text("command.bananaclaims.member.add.subowner", target.getName().getString(), claim.getName())
                 );
 
                 yield 0;
@@ -216,12 +186,7 @@ public final class AddMemberCommand {
 
             case PLAYER_IS_MEMBER -> {
                 source.sendFailure(
-                        Component.literal(
-                                target.getName().getString()
-                                        + " is already a member of claim \""
-                                        + claim.getName()
-                                        + "\"."
-                        )
+                        BananaClaimsMessages.text("command.bananaclaims.member.add.member", target.getName().getString(), claim.getName())
                 );
 
                 yield 0;
@@ -229,9 +194,7 @@ public final class AddMemberCommand {
 
             case NOT_AUTHORIZED -> {
                 source.sendFailure(
-                        Component.literal(
-                                "You cannot edit members for this claim."
-                        )
+                        BananaClaimsMessages.text("command.bananaclaims.member.add.not_authorized")
                 );
 
                 yield 0;
@@ -239,9 +202,7 @@ public final class AddMemberCommand {
 
             default -> {
                 source.sendFailure(
-                        Component.literal(
-                                "Unable to add that player as a member."
-                        )
+                        BananaClaimsMessages.text("command.bananaclaims.member.add.failed")
                 );
 
                 yield 0;

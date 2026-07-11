@@ -1,5 +1,7 @@
 package com.bananasandwich.bananaclaims.command;
 
+import com.bananasandwich.bananaclaims.localization.BananaClaimsMessages;
+
 import com.bananasandwich.bananaclaims.Bananaclaims;
 import com.bananasandwich.bananaclaims.claim.Claim;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -7,7 +9,6 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
 
@@ -46,11 +47,7 @@ public class ShrinkClaimCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "You cannot manage a claim named \""
-                                    + claimName
-                                    + "\"."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.cannot_manage_named", claimName)
             );
 
             return 0;
@@ -60,9 +57,7 @@ public class ShrinkClaimCommand {
 
         if (!claim.canResize(player.getUUID())) {
             source.sendFailure(
-                    Component.literal(
-                            "You cannot resize this claim."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.shrink.cannot_resize")
             );
 
             return 0;
@@ -77,11 +72,7 @@ public class ShrinkClaimCommand {
                 chunkPosition.z()
         )) {
             source.sendFailure(
-                    Component.literal(
-                            "This chunk is not part of claim \""
-                                    + claim.getName()
-                                    + "\"."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.shrink.not_part", claim.getName())
             );
 
             return 0;
@@ -89,10 +80,7 @@ public class ShrinkClaimCommand {
 
         if (claim.getChunks().size() <= 1) {
             source.sendFailure(
-                    Component.literal(
-                            "You cannot shrink the last chunk of a claim. "
-                                    + "Use /claim delete instead."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.shrink.last_chunk")
             );
 
             return 0;
@@ -107,11 +95,7 @@ public class ShrinkClaimCommand {
         Bananaclaims.CLAIM_MANAGER.saveClaims();
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "Removed this chunk from claim \""
-                                + claim.getName()
-                                + "\"."
-                ),
+                () -> BananaClaimsMessages.text("command.bananaclaims.shrink.success", claim.getName()),
                 false
         );
 

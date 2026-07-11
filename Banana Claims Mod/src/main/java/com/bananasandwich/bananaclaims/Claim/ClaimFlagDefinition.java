@@ -139,7 +139,8 @@ public enum ClaimFlagDefinition {
     }
 
     public boolean isCommandAvailable() {
-        return this != MOB_GRIEFING;
+        return this != FIRE_SPREAD
+                && this != MOB_GRIEFING;
     }
 
     public static Optional<ClaimFlagDefinition> findCommandFlag(

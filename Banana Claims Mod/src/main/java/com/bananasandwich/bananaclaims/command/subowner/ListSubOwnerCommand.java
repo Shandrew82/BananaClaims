@@ -1,11 +1,12 @@
 package com.bananasandwich.bananaclaims.command.subowner;
 
+import com.bananasandwich.bananaclaims.localization.BananaClaimsMessages;
+
 import com.bananasandwich.bananaclaims.claim.Claim;
 import com.bananasandwich.bananaclaims.claim.ClaimSubOwner;
 import com.bananasandwich.bananaclaims.command.ClaimResolver;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.List;
@@ -23,7 +24,7 @@ public final class ListSubOwnerCommand {
         Optional<Claim> optionalClaim = ClaimResolver.findAtPlayer(player);
 
         if (optionalClaim.isEmpty()) {
-            source.sendFailure(Component.literal("There is no claim here."));
+            source.sendFailure(BananaClaimsMessages.text("command.bananaclaims.error.no_claim_here"));
             return 0;
         }
 
@@ -37,9 +38,7 @@ public final class ListSubOwnerCommand {
         Optional<Claim> optionalClaim = ClaimResolver.findByName(claimName);
 
         if (optionalClaim.isEmpty()) {
-            source.sendFailure(Component.literal(
-                    "No claim found named \"" + claimName + "\"."
-            ));
+            source.sendFailure(BananaClaimsMessages.text("command.bananaclaims.error.no_claim_named", claimName));
             return 0;
         }
 
@@ -62,14 +61,7 @@ public final class ListSubOwnerCommand {
                 : "\n- " + String.join("\n- ", names);
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "Subowners of claim \""
-                                + claim.getName()
-                                + "\" ("
-                                + names.size()
-                                + "): "
-                                + list
-                ),
+                () -> BananaClaimsMessages.text("command.bananaclaims.subowner.list", claim.getName(), names.size(), list),
                 false
         );
 

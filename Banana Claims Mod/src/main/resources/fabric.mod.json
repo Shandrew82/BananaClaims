@@ -3,27 +3,23 @@
   "id": "bananaclaims",
   "version": "${version}",
   "name": "Banana Claims",
-  "description": "A polished server-side claim, settlement, protection, and visualization system for Fabric servers.",
+  "description": "A production-focused server-side land claim, protection, visualization, and settlement foundation for Fabric servers.",
   "authors": [
     "Banana Sandwich SMP"
   ],
+  "contact": {
+    "homepage": "https://bananasandwich.us/"
+  },
   "license": "CC0-1.0",
   "icon": "assets/bananaclaims/icon.png",
   "environment": "*",
   "entrypoints": {
     "main": [
       "com.bananasandwich.bananaclaims.Bananaclaims"
-    ],
-    "client": [
-      "com.bananasandwich.bananaclaims.client.BananaclaimsClient"
     ]
   },
   "mixins": [
-    "bananaclaims.mixins.json",
-    {
-      "config": "bananaclaims.client.mixins.json",
-      "environment": "client"
-    }
+    "bananaclaims.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=0.19.3",
@@ -32,6 +28,7 @@
     "fabric-api": "*"
   },
   "suggests": {
+    "bluemap": "*",
     "fabric-permissions-api-v0": "*",
     "luckperms": "*"
   }

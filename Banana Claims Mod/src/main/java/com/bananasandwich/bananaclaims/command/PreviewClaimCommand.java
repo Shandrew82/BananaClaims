@@ -1,13 +1,13 @@
 package com.bananasandwich.bananaclaims.command;
 
 import com.bananasandwich.bananaclaims.Bananaclaims;
+import com.bananasandwich.bananaclaims.localization.BananaClaimsMessages;
 import com.bananasandwich.bananaclaims.claim.Claim;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -69,9 +69,7 @@ public final class PreviewClaimCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "There is no claim here."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.no_claim_here")
             );
 
             return 0;
@@ -98,11 +96,7 @@ public final class PreviewClaimCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "You cannot manage a claim named \""
-                                    + claimName
-                                    + "\"."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.cannot_manage_named", claimName)
             );
 
             return 0;
@@ -142,9 +136,7 @@ public final class PreviewClaimCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "You do not manage any claims in this dimension."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.preview.no_managed_dimension")
             );
 
             return 0;
@@ -169,18 +161,14 @@ public final class PreviewClaimCommand {
 
         if (!stopped) {
             source.sendFailure(
-                    Component.literal(
-                            "You do not have an active claim preview."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.preview.none_active")
             );
 
             return 0;
         }
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "Stopped your claim preview."
-                ),
+                () -> BananaClaimsMessages.text("command.bananaclaims.preview.stopped"),
                 false
         );
 
@@ -198,9 +186,7 @@ public final class PreviewClaimCommand {
                 .toString()
                 .equals(claim.getDimension())) {
             source.sendFailure(
-                    Component.literal(
-                            "That claim is in another dimension."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.preview.other_dimension")
             );
 
             return 0;
@@ -215,9 +201,7 @@ public final class PreviewClaimCommand {
 
         if (!shown) {
             source.sendFailure(
-                    Component.literal(
-                            "Unable to create a preview for that claim."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.preview.failed")
             );
 
             return 0;
@@ -228,13 +212,7 @@ public final class PreviewClaimCommand {
                         .getDurationDescription();
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "Showing the 3D boundary for claim \""
-                                + claim.getName()
-                                + "\" for "
-                                + duration
-                                + "."
-                ),
+                () -> BananaClaimsMessages.text("command.bananaclaims.preview.success", claim.getName(), duration),
                 false
         );
 

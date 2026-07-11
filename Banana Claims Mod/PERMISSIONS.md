@@ -1,63 +1,109 @@
 # Banana Claims Permissions
 
-Banana Claims integrates with LuckPerms through Fabric Permissions API v0 when it is installed. If the API is not available, the configured vanilla command-level fallbacks are used.
+Banana Claims integrates with LuckPerms through Fabric Permissions API v0 when available. If the external provider is unavailable or disabled, configurable vanilla command-level fallbacks are used.
 
-The broad `bananaclaims.command.admin` node grants all Banana Claims administration commands. Individual admin nodes may be granted instead.
+A permission controls whether a command is available. Claim ownership and role checks still apply after permission approval.
 
-## Public commands
+## Public Commands
 
-- `bananaclaims.command.claim`
-- `bananaclaims.command.pos1`
-- `bananaclaims.command.pos2`
-- `bananaclaims.command.create`
-- `bananaclaims.command.createarea`
-- `bananaclaims.command.preview`
-- `bananaclaims.command.leave`
-- `bananaclaims.command.info`
-- `bananaclaims.command.list`
+```text
+bananaclaims.command.claim
+bananaclaims.command.pos1
+bananaclaims.command.pos2
+bananaclaims.command.create
+bananaclaims.command.createarea
+bananaclaims.command.preview
+bananaclaims.command.leave
+bananaclaims.command.info
+bananaclaims.command.list
+```
 
-## Claim-management commands
+## Claim Management
 
-- `bananaclaims.command.expand`
-- `bananaclaims.command.shrink`
-- `bananaclaims.command.delete`
-- `bananaclaims.command.rename`
-- `bananaclaims.command.description`
-- `bananaclaims.command.member`
-- `bananaclaims.command.subowner`
-- `bananaclaims.command.transfer`
-- `bananaclaims.command.flag`
-- `bananaclaims.command.popup`
-
-These permission nodes control command availability. Claim ownership, subowner, and member rules are still enforced after the permission check.
+```text
+bananaclaims.command.expand
+bananaclaims.command.shrink
+bananaclaims.command.delete
+bananaclaims.command.rename
+bananaclaims.command.description
+bananaclaims.command.member
+bananaclaims.command.subowner
+bananaclaims.command.transfer
+bananaclaims.command.flag
+bananaclaims.command.popup
+```
 
 ## Administration
 
-- `bananaclaims.command.admin`
-- `bananaclaims.command.admin.list`
-- `bananaclaims.command.admin.info`
-- `bananaclaims.command.admin.nearest`
-- `bananaclaims.command.admin.force-transfer`
-- `bananaclaims.command.admin.force-delete`
-- `bananaclaims.command.admin.reload`
-- `bananaclaims.command.admin.reload.config`
-- `bananaclaims.command.admin.reload.claims`
-- `bananaclaims.command.admin.reload.preview`
-- `bananaclaims.command.admin.diagnostics`
+The broad node grants all Banana Claims administrative commands:
 
-## Protection
+```text
+bananaclaims.command.admin
+```
 
-- `bananaclaims.protection.bypass`
+Granular nodes:
 
-This bypasses enabled claim protections globally. Its default fallback is the configured administrator command level.
+```text
+bananaclaims.command.admin.list
+bananaclaims.command.admin.info
+bananaclaims.command.admin.nearest
+bananaclaims.command.admin.force-transfer
+bananaclaims.command.admin.force-delete
+bananaclaims.command.admin.reload
+bananaclaims.command.admin.reload.config
+bananaclaims.command.admin.reload.claims
+bananaclaims.command.admin.reload.preview
+bananaclaims.command.admin.diagnostics
+```
 
-## Configuration fallbacks
+Granting one granular node exposes only the relevant administration branch. Granting `bananaclaims.command.admin` exposes all branches.
 
-`config/bananaclaims.json` contains three default fallback levels and optional exact-node overrides:
+## Protection Bypass
 
-- `publicFallbackLevel`
-- `managementFallbackLevel`
-- `adminFallbackLevel`
-- `fallbackLevelOverrides`
+```text
+bananaclaims.protection.bypass
+```
 
-Levels are clamped to vanilla command levels `0` through `4`. Defaults preserve the behavior from before this permission milestone: public and management commands are available to players, while administration and global protection bypass require administrator level.
+This bypasses enabled protection flags globally. Owners, subowners, and members already have role-based access and do not need this node for their own claims.
+
+## Vanilla Fallbacks
+
+`config/bananaclaims.json` contains:
+
+```text
+publicFallbackLevel
+managementFallbackLevel
+adminFallbackLevel
+fallbackLevelOverrides
+```
+
+Levels are clamped to `0` through `4`. Defaults preserve public player commands and require administrator level 3 for administrative commands and global protection bypass.
+
+Example exact-node override:
+
+```json
+"fallbackLevelOverrides": {
+  "bananaclaims.command.flag": 2,
+  "bananaclaims.protection.bypass": 4
+}
+```
+
+## LuckPerms Examples
+
+Grant all administrative functionality to a staff group:
+
+```text
+/lp group admin permission set bananaclaims.command.admin true
+```
+
+Grant diagnostics only:
+
+```text
+/lp group moderator permission set bananaclaims.command.admin.diagnostics true
+```
+
+Explicitly deny claim deletion:
+
+```text
+/lp group default permission set bananaclaims.command.delete false
+```

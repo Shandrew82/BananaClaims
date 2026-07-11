@@ -1,18 +1,12 @@
-The cleanup script removes this complete legacy subsystem as one unit:
-
-src/main/java/com/bananasandwich/bananaclaims/command/PreviewV2Command.java
-
-Entire directory:
-src/main/java/com/bananasandwich/bananaclaims/preview/
-
-Known classes currently in that package include:
-- BoundaryLine.java
-- BoundaryParticleRenderer.java
-- BoundaryPreview.java
-- BoundaryPreviewManager.java
-- BoundaryShapeFactory.java
-- BoundarySurface.java
-- PreviewSettings.java
-
-The script discovers the directory contents dynamically, checks references,
-creates a backup ZIP, and then removes the package only when safe.
+src/main/java/com/bananasandwich/bananaclaims/mixin/ExampleMixin.java
+src/main/java/com/bananasandwich/bananaclaims/command/subowner/ClaimSubOwner.java
+src/client/
+docs/
+README.txt
+RETIRE_LEGACY_RENDERER.ps1
+VERIFY_ADMIN_UPDATE.ps1
+VERIFY_LIFECYCLE_UPDATE.ps1
+VERIFY_PERMISSIONS_UPDATE.ps1
+VERIFY_PRESSURE_PLATE_HOTFIX.ps1
+VERIFY_PROTECTION_UPDATE.ps1
+legacy-renderer-backup-*.zip

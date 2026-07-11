@@ -2,46 +2,65 @@ package com.bananasandwich.bananaclaims.command;
 
 import com.bananasandwich.bananaclaims.Bananaclaims;
 import com.bananasandwich.bananaclaims.claim.Claim;
+import com.bananasandwich.bananaclaims.localization.BananaClaimsMessages;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.List;
 
-public class ListClaimCommand {
+public final class ListClaimCommand {
 
-    public static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> register() {
+    private ListClaimCommand() {
+    }
+
+    public static LiteralArgumentBuilder<CommandSourceStack> register() {
         return Commands.literal("list")
                 .executes(context -> {
-                    ServerPlayer player = context.getSource().getPlayerOrException();
+                    ServerPlayer player =
+                            context.getSource()
+                                    .getPlayerOrException();
 
-                    List<Claim> claims = Bananaclaims.CLAIM_MANAGER.getClaimsForOwner(player.getUUID());
+                    List<Claim> claims =
+                            Bananaclaims.CLAIM_MANAGER
+                                    .getClaimsForOwner(
+                                            player.getUUID()
+                                    );
 
                     if (claims.isEmpty()) {
                         context.getSource().sendSuccess(
-                                () -> Component.literal("You do not own any claims."),
+                                () -> BananaClaimsMessages.text(
+                                        "command.bananaclaims.list.empty"
+                                ),
                                 false
                         );
                         return 1;
                     }
 
-                    StringBuilder message = new StringBuilder("Your Claims:\n");
+                    StringBuilder message = new StringBuilder(
+                            BananaClaimsMessages.string(
+                                    "command.bananaclaims.list.header",
+                                    claims.size()
+                            )
+                    );
 
                     for (Claim claim : claims) {
-                        message.append("- ")
-                                .append(claim.getName())
-                                .append(" (")
-                                .append(claim.getChunkX())
-                                .append(", ")
-                                .append(claim.getChunkZ())
-                                .append(")\n");
+                        message.append(
+                                BananaClaimsMessages.string(
+                                        "command.bananaclaims.list.entry",
+                                        claim.getName(),
+                                        claim.getDimension(),
+                                        claim.getChunks().size()
+                                )
+                        );
                     }
 
-                    message.append("Total: ").append(claims.size());
-
                     context.getSource().sendSuccess(
-                            () -> Component.literal(message.toString()),
+                            () -> BananaClaimsMessages.text(
+                                    "command.bananaclaims.raw",
+                                    message
+                            ),
                             false
                     );
 

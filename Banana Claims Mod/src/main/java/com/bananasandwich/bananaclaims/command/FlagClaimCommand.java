@@ -1,6 +1,7 @@
 package com.bananasandwich.bananaclaims.command;
 
 import com.bananasandwich.bananaclaims.Bananaclaims;
+import com.bananasandwich.bananaclaims.localization.BananaClaimsMessages;
 import com.bananasandwich.bananaclaims.claim.Claim;
 import com.bananasandwich.bananaclaims.claim.ClaimFlagDefinition;
 import com.mojang.brigadier.arguments.BoolArgumentType;
@@ -9,7 +10,6 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.List;
@@ -114,14 +114,7 @@ public final class FlagClaimCommand {
         boolean value = flag.getValue(claim.getFlags());
 
         source.sendSuccess(
-                () -> Component.literal(
-                        flag.getCanonicalName()
-                                + " is "
-                                + value
-                                + " for claim \""
-                                + claim.getName()
-                                + "\"."
-                ),
+                () -> BananaClaimsMessages.text("command.bananaclaims.flag.status", flag.getCanonicalName(), value, claim.getName()),
                 false
         );
 
@@ -149,11 +142,7 @@ public final class FlagClaimCommand {
         if (player == null
                 || !claim.canEditFlags(player.getUUID())) {
             source.sendFailure(
-                    Component.literal(
-                            "You cannot edit flags for claim \""
-                                    + claim.getName()
-                                    + "\"."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.flag.cannot_edit", claim.getName())
             );
 
             return 0;
@@ -172,14 +161,7 @@ public final class FlagClaimCommand {
 
         if (previousValue == value) {
             source.sendSuccess(
-                    () -> Component.literal(
-                            flag.getCanonicalName()
-                                    + " is already "
-                                    + value
-                                    + " for claim \""
-                                    + claim.getName()
-                                    + "\"."
-                    ),
+                    () -> BananaClaimsMessages.text("command.bananaclaims.flag.already", flag.getCanonicalName(), value, claim.getName()),
                     false
             );
 
@@ -194,15 +176,7 @@ public final class FlagClaimCommand {
         Bananaclaims.CLAIM_MANAGER.saveClaims();
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "Set "
-                                + flag.getCanonicalName()
-                                + " to "
-                                + value
-                                + " for claim \""
-                                + claim.getName()
-                                + "\"."
-                ),
+                () -> BananaClaimsMessages.text("command.bananaclaims.flag.success", flag.getCanonicalName(), value, claim.getName()),
                 false
         );
 
@@ -217,9 +191,7 @@ public final class FlagClaimCommand {
 
         if (player == null) {
             source.sendFailure(
-                    Component.literal(
-                            "Only players can edit claim flags."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.flag.players_only")
             );
 
             return Optional.empty();
@@ -233,11 +205,7 @@ public final class FlagClaimCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "You cannot manage a claim named \""
-                                    + claimName
-                                    + "\"."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.cannot_manage_named", claimName)
             );
         }
 
@@ -249,16 +217,7 @@ public final class FlagClaimCommand {
             String flagName
     ) {
         source.sendFailure(
-                Component.literal(
-                        "Unknown flag \""
-                                + flagName
-                                + "\". Available flags: "
-                                + String.join(
-                                ", ",
-                                ClaimFlagDefinition.canonicalNames()
-                        )
-                                + "."
-                )
+                BananaClaimsMessages.text("command.bananaclaims.flag.unknown", flagName, String.join(", ", ClaimFlagDefinition.canonicalNames()))
         );
     }
 }

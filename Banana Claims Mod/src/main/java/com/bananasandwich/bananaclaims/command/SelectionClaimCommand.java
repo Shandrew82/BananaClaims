@@ -1,13 +1,13 @@
 package com.bananasandwich.bananaclaims.command;
 
 import com.bananasandwich.bananaclaims.Bananaclaims;
+import com.bananasandwich.bananaclaims.localization.BananaClaimsMessages;
 import com.bananasandwich.bananaclaims.selection.ClaimSelection;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 public class SelectionClaimCommand {
@@ -36,12 +36,7 @@ public class SelectionClaimCommand {
         );
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "Claim position 1 set to "
-                                + position.getX() + ", "
-                                + position.getY() + ", "
-                                + position.getZ() + "."
-                ),
+                () -> BananaClaimsMessages.text("command.bananaclaims.selection.pos1", position.getX(), position.getY(), position.getZ()),
                 false
         );
 
@@ -67,12 +62,7 @@ public class SelectionClaimCommand {
         );
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "Claim position 2 set to "
-                                + position.getX() + ", "
-                                + position.getY() + ", "
-                                + position.getZ() + "."
-                ),
+                () -> BananaClaimsMessages.text("command.bananaclaims.selection.pos2", position.getX(), position.getY(), position.getZ()),
                 false
         );
 
@@ -102,9 +92,7 @@ public class SelectionClaimCommand {
             stopPreview(player);
 
             source.sendFailure(
-                    Component.literal(
-                            "Both claim positions must be in the same dimension to preview the selection."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.selection.same_dimension")
             );
 
             return;
@@ -119,9 +107,7 @@ public class SelectionClaimCommand {
 
         if (!shown) {
             source.sendFailure(
-                    Component.literal(
-                            "Unable to create a preview for that selection."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.selection.preview_failed")
             );
 
             return;
@@ -132,11 +118,7 @@ public class SelectionClaimCommand {
                         .getDurationDescription();
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "Showing the full-height 3D selection boundary for "
-                                + duration
-                                + "."
-                ),
+                () -> BananaClaimsMessages.text("command.bananaclaims.selection.preview_success", duration),
                 false
         );
     }

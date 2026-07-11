@@ -1,11 +1,12 @@
 package com.bananasandwich.bananaclaims.command;
 
+import com.bananasandwich.bananaclaims.localization.BananaClaimsMessages;
+
 import com.bananasandwich.bananaclaims.Bananaclaims;
 import com.bananasandwich.bananaclaims.claim.Claim;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
 
@@ -33,14 +34,14 @@ public class CreateClaimCommand {
 
                             if (!created) {
                                 context.getSource().sendFailure(
-                                        Component.literal("This chunk is already claimed.")
+                                        BananaClaimsMessages.text("command.bananaclaims.error.chunk_claimed")
                                 );
                                 return 0;
                             }
 
 
                             context.getSource().sendSuccess(
-                                    () -> Component.literal("Claim \"" + name + "\" created successfully."),
+                                    () -> BananaClaimsMessages.text("command.bananaclaims.create.success", name),
                                     false
                             );
 

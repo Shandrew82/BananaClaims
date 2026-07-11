@@ -1,5 +1,7 @@
 package com.bananasandwich.bananaclaims.command;
 
+import com.bananasandwich.bananaclaims.localization.BananaClaimsMessages;
+
 import com.bananasandwich.bananaclaims.Bananaclaims;
 import com.bananasandwich.bananaclaims.claim.Claim;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -7,7 +9,6 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
 
@@ -47,9 +48,7 @@ public class ExpandClaimCommand {
                 chunkPosition.z()
         )) {
             source.sendFailure(
-                    Component.literal(
-                            "This chunk is already claimed."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.chunk_claimed")
             );
 
             return 0;
@@ -63,11 +62,7 @@ public class ExpandClaimCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "You cannot manage a claim named \""
-                                    + claimName
-                                    + "\"."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.cannot_manage_named", claimName)
             );
 
             return 0;
@@ -77,9 +72,7 @@ public class ExpandClaimCommand {
 
         if (!claim.canResize(player.getUUID())) {
             source.sendFailure(
-                    Component.literal(
-                            "You cannot resize this claim."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.expand.cannot_resize")
             );
 
             return 0;
@@ -94,11 +87,7 @@ public class ExpandClaimCommand {
         Bananaclaims.CLAIM_MANAGER.saveClaims();
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "Added this chunk to claim \""
-                                + claim.getName()
-                                + "\"."
-                ),
+                () -> BananaClaimsMessages.text("command.bananaclaims.expand.success", claim.getName()),
                 false
         );
 

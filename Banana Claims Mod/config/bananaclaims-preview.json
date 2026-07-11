@@ -1,0 +1,51 @@
+{
+  "configVersion": 4,
+  "durationTicks": 200,
+  "viewRange": 4.0,
+  "glowEnabled": true,
+  "glowColor": "#A855F7",
+  "shadowRadius": 0.0,
+  "shadowStrength": 0.0,
+  "testPreviewSize": 8,
+  "testPreviewDistance": 7.0,
+  "minimumColumnHeight": 1.0,
+  "border": {
+    "material": "minecraft:amethyst_block",
+    "glowEnabled": true,
+    "thickness": 0.35,
+    "height": 0.35,
+    "terrainOffset": 0.18
+  },
+  "corners": {
+    "material": "minecraft:lapis_block",
+    "size": 1.15,
+    "height": 1.15,
+    "anchorGlowEnabled": true,
+    "columnsEnabled": true,
+    "columnGlowEnabled": false,
+    "columnThickness": 0.28,
+    "columnGap": 0.1
+  },
+  "guides": {
+    "enabled": true,
+    "glowEnabled": false,
+    "material": "minecraft:amethyst_block",
+    "spacing": 16,
+    "width": 0.18
+  },
+  "terrain": {
+    "ignoreLogs": true,
+    "ignoreLeaves": true
+  },
+  "animations": {
+    "fadeEnabled": false,
+    "fadeInTicks": 10,
+    "fadeOutTicks": 10,
+    "fadeUpdateIntervalTicks": 1,
+    "fadeMinimumScale": 0.05,
+    "pulseEnabled": false,
+    "pulsePeriodTicks": 20,
+    "pulseUpdateIntervalTicks": 2,
+    "pulseMinimumScale": 0.9
+  }
+}

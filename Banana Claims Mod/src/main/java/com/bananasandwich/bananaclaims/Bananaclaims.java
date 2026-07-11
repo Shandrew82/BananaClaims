@@ -5,6 +5,7 @@ import com.bananasandwich.bananaclaims.command.ClaimCommand;
 import com.bananasandwich.bananaclaims.config.BananaClaimsConfigManager;
 import com.bananasandwich.bananaclaims.integration.bluemap.BlueMapIntegration;
 import com.bananasandwich.bananaclaims.notification.ClaimNotificationManager;
+import com.bananasandwich.bananaclaims.localization.BananaClaimsMessages;
 import com.bananasandwich.bananaclaims.permission.ClaimPermissionService;
 import com.bananasandwich.bananaclaims.previewv2.DisplayPreviewV2Manager;
 import com.bananasandwich.bananaclaims.previewv2.PreviewV2ConfigManager;
@@ -65,7 +66,9 @@ public class Bananaclaims implements ModInitializer {
 
     @Override
     public void onInitialize() {
-        LOGGER.info("Banana Claims loaded!");
+        LOGGER.info("Initializing Banana Claims...");
+
+        int languageEntries = BananaClaimsMessages.size();
 
         CONFIG_MANAGER.load();
         PREVIEW_V2_CONFIG_MANAGER.load();
@@ -84,6 +87,12 @@ public class Bananaclaims implements ModInitializer {
         ClaimNotificationManager.register();
         CLAIM_PROTECTION_MANAGER.register();
         BlueMapIntegration.register();
+
+        LOGGER.info(
+                "Banana Claims initialized with {} claim(s) and {} language entries.",
+                CLAIM_MANAGER.getAllClaims().size(),
+                languageEntries
+        );
     }
 
     public static Identifier id(

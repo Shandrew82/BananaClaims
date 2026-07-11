@@ -1,6 +1,7 @@
 package com.bananasandwich.bananaclaims.command.subowner;
 
 import com.bananasandwich.bananaclaims.Bananaclaims;
+import com.bananasandwich.bananaclaims.localization.BananaClaimsMessages;
 import com.bananasandwich.bananaclaims.claim.Claim;
 import com.bananasandwich.bananaclaims.claim.ClaimMutationResult;
 import com.bananasandwich.bananaclaims.claim.ClaimSubOwner;
@@ -11,7 +12,6 @@ import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Optional;
@@ -69,9 +69,7 @@ public final class RemoveSubOwnerCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "There is no claim here."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.no_claim_here")
             );
             return 0;
         }
@@ -98,11 +96,7 @@ public final class RemoveSubOwnerCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "You do not own a claim named \""
-                                    + claimName
-                                    + "\"."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.not_owner_named", claimName)
             );
             return 0;
         }
@@ -132,13 +126,7 @@ public final class RemoveSubOwnerCommand {
 
         if (optionalSubOwner.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "\""
-                                    + playerName
-                                    + "\" is not a subowner of claim \""
-                                    + claim.getName()
-                                    + "\"."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.subowner.remove.not_subowner", playerName, claim.getName())
             );
             return 0;
         }
@@ -154,23 +142,13 @@ public final class RemoveSubOwnerCommand {
 
         if (result != ClaimMutationResult.SUBOWNER_DEMOTED_TO_MEMBER) {
             source.sendFailure(
-                    Component.literal(
-                            result == ClaimMutationResult.NOT_AUTHORIZED
-                                    ? "Only the claim owner can remove subowners."
-                                    : "Unable to remove that subowner."
-                    )
+                    (result == ClaimMutationResult.NOT_AUTHORIZED ? BananaClaimsMessages.text("command.bananaclaims.subowner.remove.not_authorized") : BananaClaimsMessages.text("command.bananaclaims.subowner.remove.failed"))
             );
             return 0;
         }
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "Removed "
-                                + subOwner.getName()
-                                + " as a subowner of claim \""
-                                + claim.getName()
-                                + "\". They remain a regular member."
-                ),
+                () -> BananaClaimsMessages.text("command.bananaclaims.subowner.remove.success_actor", subOwner.getName(), claim.getName()),
                 false
         );
 
@@ -184,11 +162,7 @@ public final class RemoveSubOwnerCommand {
                 .findFirst()
                 .ifPresent(player ->
                         player.sendSystemMessage(
-                                Component.literal(
-                                        "You are no longer a subowner of claim \""
-                                                + claim.getName()
-                                                + "\". You remain a regular member."
-                                )
+                                BananaClaimsMessages.text("command.bananaclaims.subowner.remove.success_target", claim.getName())
                         )
                 );
 

@@ -1,12 +1,13 @@
 package com.bananasandwich.bananaclaims.command.member;
 
+import com.bananasandwich.bananaclaims.localization.BananaClaimsMessages;
+
 import com.bananasandwich.bananaclaims.claim.Claim;
 import com.bananasandwich.bananaclaims.claim.ClaimMember;
 import com.bananasandwich.bananaclaims.claim.ClaimSubOwner;
 import com.bananasandwich.bananaclaims.command.ClaimResolver;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.ArrayList;
@@ -29,9 +30,7 @@ public final class ListMemberCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "There is no claim here."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.no_claim_here")
             );
 
             return 0;
@@ -52,11 +51,7 @@ public final class ListMemberCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "No claim found named \""
-                                    + claimName
-                                    + "\"."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.no_claim_named", claimName)
             );
 
             return 0;
@@ -107,14 +102,7 @@ public final class ListMemberCommand {
         );
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "People in claim \""
-                                + claim.getName()
-                                + "\" ("
-                                + people.size()
-                                + "):\n- "
-                                + peopleList
-                ),
+                () -> BananaClaimsMessages.text("command.bananaclaims.member.list", claim.getName(), people.size(), peopleList),
                 false
         );
 

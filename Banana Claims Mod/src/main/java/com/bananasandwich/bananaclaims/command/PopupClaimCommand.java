@@ -1,5 +1,7 @@
 package com.bananasandwich.bananaclaims.command;
 
+import com.bananasandwich.bananaclaims.localization.BananaClaimsMessages;
+
 import com.bananasandwich.bananaclaims.Bananaclaims;
 import com.bananasandwich.bananaclaims.claim.Claim;
 import com.bananasandwich.bananaclaims.claim.PopupDisplayMode;
@@ -8,7 +10,6 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Optional;
@@ -200,9 +201,7 @@ public class PopupClaimCommand {
             player = source.getPlayerOrException();
         } catch (Exception exception) {
             source.sendFailure(
-                    Component.literal(
-                            "Only players can preview claim popups."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.popup.preview_players_only")
             );
 
             return 0;
@@ -213,11 +212,7 @@ public class PopupClaimCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "No claim found named \""
-                                    + claimName
-                                    + "\"."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.no_claim_named", claimName)
             );
 
             return 0;
@@ -241,9 +236,7 @@ public class PopupClaimCommand {
             player = source.getPlayerOrException();
         } catch (Exception exception) {
             source.sendFailure(
-                    Component.literal(
-                            "Only players can preview claim popups."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.popup.preview_players_only")
             );
 
             return 0;
@@ -254,11 +247,7 @@ public class PopupClaimCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "No claim found named \""
-                                    + claimName
-                                    + "\"."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.no_claim_named", claimName)
             );
 
             return 0;
@@ -282,9 +271,7 @@ public class PopupClaimCommand {
             player = source.getPlayerOrException();
         } catch (Exception exception) {
             source.sendFailure(
-                    Component.literal(
-                            "Only players can edit claim popups."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.popup.edit_players_only")
             );
             return Optional.empty();
         }
@@ -297,11 +284,7 @@ public class PopupClaimCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "You cannot manage a claim named \""
-                                    + claimName
-                                    + "\"."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.cannot_manage_named", claimName)
             );
             return Optional.empty();
         }
@@ -310,11 +293,7 @@ public class PopupClaimCommand {
 
         if (!claim.canEditPopup(player.getUUID())) {
             source.sendFailure(
-                    Component.literal(
-                            "You cannot edit popup settings for claim \""
-                                    + claim.getName()
-                                    + "\"."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.popup.cannot_edit", claim.getName())
             );
             return Optional.empty();
         }
@@ -342,9 +321,7 @@ public class PopupClaimCommand {
             );
         } catch (IllegalArgumentException exception) {
             source.sendFailure(
-                    Component.literal(
-                            "Invalid popup mode. Use ACTIONBAR, TITLE, or CHAT."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.popup.invalid_mode")
             );
 
             return 0;
@@ -356,13 +333,7 @@ public class PopupClaimCommand {
         Bananaclaims.CLAIM_MANAGER.saveClaims();
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "Set popup mode for \""
-                                + claim.getName()
-                                + "\" to "
-                                + mode
-                                + "."
-                ),
+                () -> BananaClaimsMessages.text("command.bananaclaims.popup.mode_set", claim.getName(), mode),
                 false
         );
 
@@ -387,11 +358,7 @@ public class PopupClaimCommand {
         Bananaclaims.CLAIM_MANAGER.saveClaims();
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "Set enter title for \""
-                                + claim.getName()
-                                + "\"."
-                ),
+                () -> BananaClaimsMessages.text("command.bananaclaims.popup.enter_title_set", claim.getName()),
                 false
         );
 
@@ -416,11 +383,7 @@ public class PopupClaimCommand {
         Bananaclaims.CLAIM_MANAGER.saveClaims();
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "Set enter subtitle for \""
-                                + claim.getName()
-                                + "\"."
-                ),
+                () -> BananaClaimsMessages.text("command.bananaclaims.popup.enter_subtitle_set", claim.getName()),
                 false
         );
 
@@ -445,11 +408,7 @@ public class PopupClaimCommand {
         Bananaclaims.CLAIM_MANAGER.saveClaims();
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "Set leave title for \""
-                                + claim.getName()
-                                + "\"."
-                ),
+                () -> BananaClaimsMessages.text("command.bananaclaims.popup.leave_title_set", claim.getName()),
                 false
         );
 
@@ -474,11 +433,7 @@ public class PopupClaimCommand {
         Bananaclaims.CLAIM_MANAGER.saveClaims();
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "Set leave subtitle for \""
-                                + claim.getName()
-                                + "\"."
-                ),
+                () -> BananaClaimsMessages.text("command.bananaclaims.popup.leave_subtitle_set", claim.getName()),
                 false
         );
 
@@ -509,17 +464,7 @@ public class PopupClaimCommand {
                 claim.getPopupSettings().getEnterSound();
 
         source.sendSuccess(
-                () -> Component.literal(
-                        savedSound.isBlank()
-                                ? "Disabled enter sound for \""
-                                  + claim.getName()
-                                  + "\"."
-                                : "Set enter sound for \""
-                                  + claim.getName()
-                                  + "\" to \""
-                                  + savedSound
-                                  + "\"."
-                ),
+                () -> (savedSound.isBlank() ? BananaClaimsMessages.text("command.bananaclaims.popup.enter_sound_disabled", claim.getName()) : BananaClaimsMessages.text("command.bananaclaims.popup.enter_sound_set", claim.getName(), savedSound)),
                 false
         );
 
@@ -550,17 +495,7 @@ public class PopupClaimCommand {
                 claim.getPopupSettings().getLeaveSound();
 
         source.sendSuccess(
-                () -> Component.literal(
-                        savedSound.isBlank()
-                                ? "Disabled leave sound for \""
-                                  + claim.getName()
-                                  + "\"."
-                                : "Set leave sound for \""
-                                  + claim.getName()
-                                  + "\" to \""
-                                  + savedSound
-                                  + "\"."
-                ),
+                () -> (savedSound.isBlank() ? BananaClaimsMessages.text("command.bananaclaims.popup.leave_sound_disabled", claim.getName()) : BananaClaimsMessages.text("command.bananaclaims.popup.leave_sound_set", claim.getName(), savedSound)),
                 false
         );
 

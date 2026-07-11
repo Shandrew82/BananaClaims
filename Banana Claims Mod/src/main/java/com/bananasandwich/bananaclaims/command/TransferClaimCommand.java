@@ -1,6 +1,7 @@
 package com.bananasandwich.bananaclaims.command;
 
 import com.bananasandwich.bananaclaims.Bananaclaims;
+import com.bananasandwich.bananaclaims.localization.BananaClaimsMessages;
 import com.bananasandwich.bananaclaims.claim.Claim;
 import com.bananasandwich.bananaclaims.claim.ClaimMutationResult;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -11,7 +12,6 @@ import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Comparator;
@@ -127,9 +127,7 @@ public final class TransferClaimCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "There is no claim here."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.no_claim_here")
             );
 
             return 0;
@@ -159,11 +157,7 @@ public final class TransferClaimCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "You do not own a claim named \""
-                                    + claimName
-                                    + "\"."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.not_owner_named", claimName)
             );
 
             return 0;
@@ -197,11 +191,7 @@ public final class TransferClaimCommand {
 
         if (optionalTarget.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "No online player found named \""
-                                    + playerName
-                                    + "\"."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.online_player_not_found", playerName)
             );
 
             return 0;
@@ -221,23 +211,12 @@ public final class TransferClaimCommand {
         return switch (result) {
             case OWNERSHIP_TRANSFERRED -> {
                 source.sendSuccess(
-                        () -> Component.literal(
-                                "Transferred ownership of claim \""
-                                        + claim.getName()
-                                        + "\" to "
-                                        + target.getName().getString()
-                                        + ". You are now a member of the claim."
-                        ),
+                        () -> BananaClaimsMessages.text("command.bananaclaims.transfer.success_actor", claim.getName(), target.getName().getString()),
                         false
                 );
 
                 target.sendSystemMessage(
-                        Component.literal(
-                                previousOwnerName
-                                        + " transferred ownership of claim \""
-                                        + claim.getName()
-                                        + "\" to you."
-                        )
+                        BananaClaimsMessages.text("command.bananaclaims.transfer.success_target", previousOwnerName, claim.getName())
                 );
 
                 yield 1;
@@ -245,10 +224,7 @@ public final class TransferClaimCommand {
 
             case SAME_OWNER -> {
                 source.sendFailure(
-                        Component.literal(
-                                target.getName().getString()
-                                        + " already owns this claim."
-                        )
+                        BananaClaimsMessages.text("command.bananaclaims.transfer.same_owner", target.getName().getString())
                 );
 
                 yield 0;
@@ -256,12 +232,7 @@ public final class TransferClaimCommand {
 
             case DUPLICATE_OWNER_CLAIM_NAME -> {
                 source.sendFailure(
-                        Component.literal(
-                                target.getName().getString()
-                                        + " already owns a claim named \""
-                                        + claim.getName()
-                                        + "\". Rename one of the claims before transferring ownership."
-                        )
+                        BananaClaimsMessages.text("command.bananaclaims.transfer.duplicate_name", target.getName().getString(), claim.getName())
                 );
 
                 yield 0;
@@ -269,9 +240,7 @@ public final class TransferClaimCommand {
 
             case NOT_AUTHORIZED -> {
                 source.sendFailure(
-                        Component.literal(
-                                "Only the current owner can transfer this claim."
-                        )
+                        BananaClaimsMessages.text("command.bananaclaims.transfer.not_owner")
                 );
 
                 yield 0;
@@ -279,9 +248,7 @@ public final class TransferClaimCommand {
 
             default -> {
                 source.sendFailure(
-                        Component.literal(
-                                "Unable to transfer ownership of that claim."
-                        )
+                        BananaClaimsMessages.text("command.bananaclaims.transfer.failed")
                 );
 
                 yield 0;

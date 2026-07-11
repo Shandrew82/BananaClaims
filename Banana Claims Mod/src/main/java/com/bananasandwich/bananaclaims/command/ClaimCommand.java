@@ -1,6 +1,7 @@
 package com.bananasandwich.bananaclaims.command;
 
 import com.bananasandwich.bananaclaims.Bananaclaims;
+import com.bananasandwich.bananaclaims.localization.BananaClaimsMessages;
 import com.bananasandwich.bananaclaims.command.admin.AdminClaimCommand;
 import com.bananasandwich.bananaclaims.command.member.MemberCommand;
 import com.bananasandwich.bananaclaims.command.subowner.SubOwnerCommand;
@@ -9,7 +10,6 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.Component;
 
 public class ClaimCommand {
 
@@ -24,20 +24,14 @@ public class ClaimCommand {
                                     ClaimPermission.COMMAND_ROOT
                             )) {
                                 context.getSource().sendFailure(
-                                        Component.translatableWithFallback(
-                                                "command.bananaclaims.permission_denied",
-                                                "You do not have permission to use that Banana Claims command."
-                                        )
+                                        BananaClaimsMessages.text("command.bananaclaims.permission_denied")
                                 );
 
                                 return 0;
                             }
 
                             context.getSource().sendSuccess(
-                                    () -> Component.translatableWithFallback(
-                                            "command.bananaclaims.loaded",
-                                            "Banana Claims is loaded."
-                                    ),
+                                    () -> BananaClaimsMessages.text("command.bananaclaims.loaded"),
                                     false
                             );
 

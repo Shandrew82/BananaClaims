@@ -1,6 +1,7 @@
 package com.bananasandwich.bananaclaims.command;
 
 import com.bananasandwich.bananaclaims.Bananaclaims;
+import com.bananasandwich.bananaclaims.localization.BananaClaimsMessages;
 import com.bananasandwich.bananaclaims.claim.Claim;
 import com.bananasandwich.bananaclaims.claim.ClaimMutationResult;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -8,7 +9,6 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Optional;
@@ -57,9 +57,7 @@ public final class LeaveClaimCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "There is no claim here."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.no_claim_here")
             );
 
             return 0;
@@ -87,11 +85,7 @@ public final class LeaveClaimCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "You do not participate in a claim named \""
-                                    + claimName
-                                    + "\"."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.leave.not_participant_named", claimName)
             );
 
             return 0;
@@ -118,11 +112,7 @@ public final class LeaveClaimCommand {
         return switch (result) {
             case MEMBER_LEFT -> {
                 source.sendSuccess(
-                        () -> Component.literal(
-                                "You have left claim \""
-                                        + claim.getName()
-                                        + "\"."
-                        ),
+                        () -> BananaClaimsMessages.text("command.bananaclaims.leave.member_success", claim.getName()),
                         false
                 );
 
@@ -130,10 +120,7 @@ public final class LeaveClaimCommand {
                         source,
                         claim,
                         player,
-                        player.getName().getString()
-                                + " left claim \""
-                                + claim.getName()
-                                + "\"."
+                        "command.bananaclaims.leave.owner_notice_member"
                 );
 
                 yield 1;
@@ -141,11 +128,7 @@ public final class LeaveClaimCommand {
 
             case SUBOWNER_STEPPED_DOWN -> {
                 source.sendSuccess(
-                        () -> Component.literal(
-                                "You stepped down as a subowner of claim \""
-                                        + claim.getName()
-                                        + "\" and remain a regular member."
-                        ),
+                        () -> BananaClaimsMessages.text("command.bananaclaims.leave.subowner_success", claim.getName()),
                         false
                 );
 
@@ -153,10 +136,7 @@ public final class LeaveClaimCommand {
                         source,
                         claim,
                         player,
-                        player.getName().getString()
-                                + " stepped down as a subowner of claim \""
-                                + claim.getName()
-                                + "\" and remains a member."
+                        "command.bananaclaims.leave.owner_notice_subowner"
                 );
 
                 yield 1;
@@ -164,11 +144,7 @@ public final class LeaveClaimCommand {
 
             case OWNER_CANNOT_LEAVE -> {
                 source.sendFailure(
-                        Component.literal(
-                                "You own claim \""
-                                        + claim.getName()
-                                        + "\". Transfer ownership or delete the claim before leaving."
-                        )
+                        BananaClaimsMessages.text("command.bananaclaims.leave.owner_blocked", claim.getName())
                 );
 
                 yield 0;
@@ -176,11 +152,7 @@ public final class LeaveClaimCommand {
 
             case NOT_PARTICIPANT -> {
                 source.sendFailure(
-                        Component.literal(
-                                "You are not a member or subowner of claim \""
-                                        + claim.getName()
-                                        + "\"."
-                        )
+                        BananaClaimsMessages.text("command.bananaclaims.leave.not_participant", claim.getName())
                 );
 
                 yield 0;
@@ -188,11 +160,7 @@ public final class LeaveClaimCommand {
 
             default -> {
                 source.sendFailure(
-                        Component.literal(
-                                "Unable to leave claim \""
-                                        + claim.getName()
-                                        + "\"."
-                        )
+                        BananaClaimsMessages.text("command.bananaclaims.leave.failed", claim.getName())
                 );
 
                 yield 0;
@@ -204,7 +172,7 @@ public final class LeaveClaimCommand {
             CommandSourceStack source,
             Claim claim,
             ServerPlayer leavingPlayer,
-            String message
+            String messageKey
     ) {
         UUID ownerUuid = claim.getOwnerUuid();
 
@@ -223,7 +191,11 @@ public final class LeaveClaimCommand {
                 .findFirst()
                 .ifPresent(owner ->
                         owner.sendSystemMessage(
-                                Component.literal(message)
+                                BananaClaimsMessages.text(
+                                        messageKey,
+                                        leavingPlayer.getName().getString(),
+                                        claim.getName()
+                                )
                         )
                 );
     }

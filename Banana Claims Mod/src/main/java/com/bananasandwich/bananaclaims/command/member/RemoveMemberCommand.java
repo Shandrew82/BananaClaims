@@ -1,6 +1,7 @@
 package com.bananasandwich.bananaclaims.command.member;
 
 import com.bananasandwich.bananaclaims.Bananaclaims;
+import com.bananasandwich.bananaclaims.localization.BananaClaimsMessages;
 import com.bananasandwich.bananaclaims.claim.Claim;
 import com.bananasandwich.bananaclaims.claim.ClaimMember;
 import com.bananasandwich.bananaclaims.claim.ClaimMutationResult;
@@ -11,7 +12,6 @@ import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Optional;
@@ -75,9 +75,7 @@ public final class RemoveMemberCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "There is no claim here."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.no_claim_here")
             );
 
             return 0;
@@ -107,11 +105,7 @@ public final class RemoveMemberCommand {
 
         if (optionalClaim.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "You cannot manage a claim named \""
-                                    + claimName
-                                    + "\"."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.error.cannot_manage_named", claimName)
             );
 
             return 0;
@@ -142,13 +136,7 @@ public final class RemoveMemberCommand {
 
         if (optionalMember.isEmpty()) {
             source.sendFailure(
-                    Component.literal(
-                            "\""
-                                    + playerName
-                                    + "\" is not a regular member of claim \""
-                                    + claim.getName()
-                                    + "\"."
-                    )
+                    BananaClaimsMessages.text("command.bananaclaims.member.remove.not_member", playerName, claim.getName())
             );
 
             return 0;
@@ -165,24 +153,14 @@ public final class RemoveMemberCommand {
 
         if (result != ClaimMutationResult.MEMBER_REMOVED) {
             source.sendFailure(
-                    Component.literal(
-                            result == ClaimMutationResult.NOT_AUTHORIZED
-                                    ? "You cannot edit members for this claim."
-                                    : "Unable to remove that member."
-                    )
+                    (result == ClaimMutationResult.NOT_AUTHORIZED ? BananaClaimsMessages.text("command.bananaclaims.member.add.not_authorized") : BananaClaimsMessages.text("command.bananaclaims.member.remove.failed"))
             );
 
             return 0;
         }
 
         source.sendSuccess(
-                () -> Component.literal(
-                        "Removed "
-                                + member.getName()
-                                + " from claim \""
-                                + claim.getName()
-                                + "\"."
-                ),
+                () -> BananaClaimsMessages.text("command.bananaclaims.member.remove.success_actor", member.getName(), claim.getName()),
                 false
         );
 
@@ -197,13 +175,7 @@ public final class RemoveMemberCommand {
                 .findFirst()
                 .ifPresent(player ->
                         player.sendSystemMessage(
-                                Component.literal(
-                                        "You were removed from claim \""
-                                                + claim.getName()
-                                                + "\" by "
-                                                + actor.getName().getString()
-                                                + "."
-                                )
+                                BananaClaimsMessages.text("command.bananaclaims.member.remove.success_target", claim.getName(), actor.getName().getString())
                         )
                 );
 

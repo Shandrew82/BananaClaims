@@ -7,6 +7,8 @@ import com.bananasandwich.bananaclaims.claim.ClaimMember;
 import com.bananasandwich.bananaclaims.claim.ClaimSubOwner;
 import com.bananasandwich.bananaclaims.claim.event.ClaimChangeEvent;
 import com.bananasandwich.bananaclaims.claim.event.ClaimChangeListener;
+import com.bananasandwich.bananaclaims.claim.event.ClaimChangeType;
+import com.bananasandwich.bananaclaims.localization.BananaClaimsMessages;
 import com.flowpowered.math.vector.Vector2d;
 import de.bluecolored.bluemap.api.BlueMapAPI;
 import de.bluecolored.bluemap.api.BlueMapMap;
@@ -27,6 +29,10 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 
+/**
+ * Optional BlueMap bridge kept in a separate class so Banana Claims can load
+ * safely when the BlueMap API is absent.
+ */
 public final class BlueMapBridge {
 
     public static final String MARKER_SET_ID = "bananaclaims";
@@ -42,8 +48,11 @@ public final class BlueMapBridge {
     private static final Map<UUID, Integer> CLAIM_FINGERPRINTS =
             new HashMap<>();
 
+    private static final Map<UUID, List<String>> CLAIM_MARKER_IDS =
+            new HashMap<>();
+
     private static BlueMapAPI activeApi;
-    private static boolean registered = false;
+    private static boolean registered;
 
     private static final Consumer<BlueMapAPI> ENABLE_LISTENER =
             BlueMapBridge::enable;
@@ -79,6 +88,7 @@ public final class BlueMapBridge {
     private static void enable(BlueMapAPI api) {
         activeApi = api;
         CLAIM_FINGERPRINTS.clear();
+        CLAIM_MARKER_IDS.clear();
 
         for (BlueMapMap map : api.getMaps()) {
             map.getMarkerSets().put(
@@ -101,6 +111,7 @@ public final class BlueMapBridge {
         }
 
         CLAIM_FINGERPRINTS.clear();
+        CLAIM_MARKER_IDS.clear();
         activeApi = null;
 
         Bananaclaims.LOGGER.info(
@@ -115,7 +126,27 @@ public final class BlueMapBridge {
             return;
         }
 
-        synchronizeAllClaims();
+        ClaimChangeType type = event.getType();
+        Claim claim = event.getClaim();
+
+        if (type == ClaimChangeType.LOADED
+                || claim == null) {
+            synchronizeAllClaims();
+            return;
+        }
+
+        if (type == ClaimChangeType.DELETED) {
+            removeClaimMarkers(
+                    activeApi,
+                    claim.getClaimId()
+            );
+            CLAIM_FINGERPRINTS.remove(
+                    claim.getClaimId()
+            );
+            return;
+        }
+
+        synchronizeClaim(claim);
     }
 
     private static void synchronizeAllClaims() {
@@ -131,26 +162,8 @@ public final class BlueMapBridge {
         Set<UUID> activeClaimIds = new HashSet<>();
 
         for (Claim claim : claims) {
-            UUID claimId = claim.getClaimId();
-            activeClaimIds.add(claimId);
-
-            int fingerprint = createFingerprint(claim);
-
-            Integer previousFingerprint =
-                    CLAIM_FINGERPRINTS.get(claimId);
-
-            if (previousFingerprint != null
-                    && previousFingerprint == fingerprint) {
-                continue;
-            }
-
-            removeClaimMarker(api, claimId);
-            addClaimMarker(api, claim);
-
-            CLAIM_FINGERPRINTS.put(
-                    claimId,
-                    fingerprint
-            );
+            activeClaimIds.add(claim.getClaimId());
+            synchronizeClaim(claim);
         }
 
         List<UUID> removedClaimIds =
@@ -162,53 +175,64 @@ public final class BlueMapBridge {
                         .toList();
 
         for (UUID removedClaimId : removedClaimIds) {
-            removeClaimMarker(
+            removeClaimMarkers(
                     api,
                     removedClaimId
             );
-
             CLAIM_FINGERPRINTS.remove(
                     removedClaimId
             );
         }
     }
 
-    private static void addClaimMarker(
-            BlueMapAPI api,
+    private static void synchronizeClaim(
             Claim claim
     ) {
-        List<Vector2d> outline = createOutline(claim);
+        BlueMapAPI api = activeApi;
 
-        if (outline.size() < 3) {
-            Bananaclaims.LOGGER.warn(
-                    "Could not create a BlueMap outline for claim \"{}\".",
-                    claim.getName()
-            );
-
+        if (api == null
+                || claim == null
+                || claim.getClaimId() == null) {
             return;
         }
 
-        Shape shape = new Shape(outline);
+        UUID claimId = claim.getClaimId();
+        int fingerprint = createFingerprint(claim);
 
-        ShapeMarker marker = new ShapeMarker(
-                claim.getName(),
-                shape,
-                MARKER_HEIGHT
+        Integer previousFingerprint =
+                CLAIM_FINGERPRINTS.get(claimId);
+
+        if (previousFingerprint != null
+                && previousFingerprint == fingerprint) {
+            return;
+        }
+
+        removeClaimMarkers(api, claimId);
+        addClaimMarkers(api, claim);
+
+        CLAIM_FINGERPRINTS.put(
+                claimId,
+                fingerprint
         );
+    }
 
-        marker.setLineWidth(2);
+    private static void addClaimMarkers(
+            BlueMapAPI api,
+            Claim claim
+    ) {
+        List<List<Vector2d>> outlines =
+                createOutlines(claim);
 
-        marker.setColors(
-                BORDER_COLOR,
-                FILL_COLOR
-        );
+        if (outlines.isEmpty()) {
+            Bananaclaims.LOGGER.warn(
+                    "Could not create a BlueMap outline for claim '{}'.",
+                    claim.getName()
+            );
+            return;
+        }
 
-        marker.setDepthTestEnabled(false);
-        marker.setListed(true);
-        marker.setDetail(createDetail(claim));
-
-        String markerId =
-                createMarkerId(claim.getClaimId());
+        List<String> markerIds = new ArrayList<>();
+        String detail = createDetail(claim);
 
         for (BlueMapMap map : api.getMaps()) {
             if (!matchesDimension(
@@ -218,27 +242,87 @@ public final class BlueMapBridge {
                 continue;
             }
 
-            MarkerSet markerSet =
-                    getOrCreateMarkerSet(map);
+            MarkerSet markerSet = getOrCreateMarkerSet(map);
 
-            markerSet.put(
-                    markerId,
-                    marker
+            for (int index = 0;
+                 index < outlines.size();
+                 index++) {
+                String markerId = createMarkerId(
+                        claim.getClaimId(),
+                        index
+                );
+
+                ShapeMarker marker = createMarker(
+                        claim,
+                        outlines.get(index),
+                        detail,
+                        index == 0
+                );
+
+                markerSet.put(markerId, marker);
+
+                if (!markerIds.contains(markerId)) {
+                    markerIds.add(markerId);
+                }
+            }
+        }
+
+        if (!markerIds.isEmpty()) {
+            CLAIM_MARKER_IDS.put(
+                    claim.getClaimId(),
+                    List.copyOf(markerIds)
             );
         }
     }
 
-    private static void removeClaimMarker(
+    private static ShapeMarker createMarker(
+            Claim claim,
+            List<Vector2d> outline,
+            String detail,
+            boolean primary
+    ) {
+        ShapeMarker marker = new ShapeMarker(
+                claim.getName(),
+                new Shape(outline),
+                MARKER_HEIGHT
+        );
+
+        marker.setLineWidth(2);
+        marker.setColors(BORDER_COLOR, FILL_COLOR);
+        marker.setDepthTestEnabled(false);
+        marker.setListed(primary);
+        marker.setDetail(detail);
+
+        return marker;
+    }
+
+    private static void removeClaimMarkers(
             BlueMapAPI api,
             UUID claimId
     ) {
-        String markerId = createMarkerId(claimId);
+        if (claimId == null) {
+            return;
+        }
+
+        List<String> markerIds =
+                CLAIM_MARKER_IDS.remove(claimId);
+
+        if (markerIds == null || markerIds.isEmpty()) {
+            markerIds = List.of(
+                    createMarkerId(claimId, 0),
+                    "claim-" + claimId
+            );
+        }
 
         for (BlueMapMap map : api.getMaps()) {
             MarkerSet markerSet =
                     map.getMarkerSets().get(MARKER_SET_ID);
 
-            if (markerSet != null) {
+            if (markerSet == null) {
+                continue;
+            }
+
+            for (String markerId : markerIds) {
                 markerSet.remove(markerId);
             }
         }
@@ -255,18 +339,16 @@ public final class BlueMapBridge {
         }
 
         MarkerSet created = createMarkerSet();
-
-        map.getMarkerSets().put(
-                MARKER_SET_ID,
-                created
-        );
+        map.getMarkerSets().put(MARKER_SET_ID, created);
 
         return created;
     }
 
     private static MarkerSet createMarkerSet() {
         MarkerSet markerSet = new MarkerSet(
-                "Banana Claims",
+                BananaClaimsMessages.string(
+                        "bluemap.bananaclaims.marker_set"
+                ),
                 true,
                 false
         );
@@ -276,7 +358,7 @@ public final class BlueMapBridge {
         return markerSet;
     }
 
-    private static List<Vector2d> createOutline(
+    private static List<List<Vector2d>> createOutlines(
             Claim claim
     ) {
         Map<Edge, Edge> boundaryEdges =
@@ -293,19 +375,16 @@ public final class BlueMapBridge {
                     new Point(minX, minZ),
                     new Point(maxX, minZ)
             );
-
             addOrRemoveEdge(
                     boundaryEdges,
                     new Point(maxX, minZ),
                     new Point(maxX, maxZ)
             );
-
             addOrRemoveEdge(
                     boundaryEdges,
                     new Point(maxX, maxZ),
                     new Point(minX, maxZ)
             );
-
             addOrRemoveEdge(
                     boundaryEdges,
                     new Point(minX, maxZ),
@@ -313,31 +392,29 @@ public final class BlueMapBridge {
             );
         }
 
-        List<List<Point>> loops =
-                traceBoundaryLoops(boundaryEdges);
-
-        if (loops.isEmpty()) {
-            return List.of();
-        }
-
-        List<Point> outerLoop =
-                loops.stream()
-                        .max(
-                                Comparator.comparingDouble(
-                                        loop -> Math.abs(
-                                                calculateSignedArea(loop)
-                                        )
+        return traceBoundaryLoops(boundaryEdges)
+                .stream()
+                .map(BlueMapBridge::simplifyLoop)
+                .filter(loop -> loop.size() >= 3)
+                .filter(loop ->
+                        calculateSignedArea(loop) > 0.0D
+                )
+                .sorted(
+                        Comparator.comparingDouble(
+                                loop -> -Math.abs(
+                                        calculateSignedArea(loop)
                                 )
                         )
-                        .orElse(List.of());
-
-        return simplifyLoop(outerLoop)
-                .stream()
-                .map(point ->
-                        new Vector2d(
-                                point.x,
-                                point.z
-                        )
+                )
+                .map(loop ->
+                        loop.stream()
+                                .map(point ->
+                                        new Vector2d(
+                                                point.x,
+                                                point.z
+                                        )
+                                )
+                                .toList()
                 )
                 .toList();
     }
@@ -371,8 +448,7 @@ public final class BlueMapBridge {
         Set<Edge> unused =
                 new HashSet<>(boundaryEdges.values());
 
-        List<List<Point>> loops =
-                new ArrayList<>();
+        List<List<Point>> loops = new ArrayList<>();
 
         while (!unused.isEmpty()) {
             Edge first = unused.iterator().next();
@@ -441,7 +517,6 @@ public final class BlueMapBridge {
             );
 
             Point current = loop.get(index);
-
             Point next = loop.get(
                     (index + 1) % loop.size()
             );
@@ -471,7 +546,6 @@ public final class BlueMapBridge {
              index < loop.size();
              index++) {
             Point current = loop.get(index);
-
             Point next = loop.get(
                     (index + 1) % loop.size()
             );
@@ -540,44 +614,80 @@ public final class BlueMapBridge {
         List<String> memberNames =
                 getSortedMemberNames(claim);
 
-        String subOwnersHtml = toHtmlList(subOwnerNames);
-        String membersHtml = toHtmlList(memberNames);
-
         String description =
                 claim.getDescription().isBlank()
-                        ? "No description."
+                        ? BananaClaimsMessages.string(
+                        "bluemap.bananaclaims.no_description"
+                )
                         : claim.getDescription();
 
-        return "<div>"
-                + "<strong>"
+        return "<div class=\"bananaclaims-marker\">"
+                + "<h3 style=\"margin:0 0 6px 0\">"
                 + escapeHtml(claim.getName())
-                + "</strong><br>"
-                + "Owner: "
-                + escapeHtml(claim.getOwnerName())
-                + "<br>"
-                + "Subowners ("
-                + subOwnerNames.size()
-                + "):<br>"
-                + subOwnersHtml
-                + "<br>"
-                + "Members ("
-                + memberNames.size()
-                + "):<br>"
-                + membersHtml
-                + "<br>"
-                + "Chunks: "
-                + claim.getChunks().size()
-                + "<br>"
-                + "Description: "
+                + "</h3>"
+                + detailRow(
+                "bluemap.bananaclaims.owner",
+                escapeHtml(claim.getOwnerName())
+        )
+                + detailList(
+                "bluemap.bananaclaims.subowners",
+                subOwnerNames
+        )
+                + detailList(
+                "bluemap.bananaclaims.members",
+                memberNames
+        )
+                + detailRow(
+                "bluemap.bananaclaims.chunks",
+                Integer.toString(claim.getChunks().size())
+        )
+                + "<hr style=\"margin:6px 0\">"
+                + "<strong>"
+                + escapeHtml(BananaClaimsMessages.string(
+                "bluemap.bananaclaims.description"
+        ))
+                + ":</strong><br>"
                 + escapeHtml(description)
                 + "</div>";
+    }
+
+    private static String detailRow(
+            String labelKey,
+            String value
+    ) {
+        return "<strong>"
+                + escapeHtml(
+                BananaClaimsMessages.string(labelKey)
+        )
+                + ":</strong> "
+                + value
+                + "<br>";
+    }
+
+    private static String detailList(
+            String labelKey,
+            List<String> names
+    ) {
+        return "<strong>"
+                + escapeHtml(
+                BananaClaimsMessages.string(labelKey)
+        )
+                + " ("
+                + names.size()
+                + "):</strong><br>"
+                + toHtmlList(names)
+                + "<br>";
     }
 
     private static String toHtmlList(
             List<String> names
     ) {
         if (names.isEmpty()) {
-            return "None";
+            return escapeHtml(
+                    BananaClaimsMessages.string(
+                            "bluemap.bananaclaims.none"
+                    )
+            );
         }
 
         return names.stream()
@@ -587,7 +697,7 @@ public final class BlueMapBridge {
                         (first, second) ->
                                 first + "<br>" + second
                 )
-                .orElse("None");
+                .orElse("");
     }
 
     private static List<String> getSortedSubOwnerNames(
@@ -634,9 +744,13 @@ public final class BlueMapBridge {
     }
 
     private static String createMarkerId(
-            UUID claimId
+            UUID claimId,
+            int outlineIndex
     ) {
-        return "claim-" + claimId;
+        return "claim-"
+                + claimId
+                + "-"
+                + outlineIndex;
     }
 
     private static int createFingerprint(
@@ -677,6 +791,7 @@ public final class BlueMapBridge {
                 claim.getOwnerUuid(),
                 claim.getOwnerName(),
                 claim.getDescription(),
+                claim.getDimension(),
                 sortedChunks,
                 sortedSubOwners,
                 sortedMembers
