@@ -1,0 +1,54 @@
+name: Banana Claims 26.3 candidate
+
+on:
+  push:
+    branches: ['port/minecraft-26.3']
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Banana Claims Mod/**'
+      - '.github/workflows/claims-26-3.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: claims-26-3-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: Banana Claims Mod
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+      - uses: gradle/actions/wrapper-validation@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Compile and run configured tests
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon --console=plain clean build
+      - name: Upload compile-only candidate (not production approval)
+        uses: actions/upload-artifact@v7
+        with:
+          name: BananaClaims-26.3-compile-candidate
+          path: |
+            Banana Claims Mod/build/libs/*.jar
+            !Banana Claims Mod/build/libs/*-sources.jar
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload diagnostic reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: BananaClaims-26.3-build-reports
+          path: Banana Claims Mod/build/reports/
+          if-no-files-found: ignore
+          retention-days: 7
