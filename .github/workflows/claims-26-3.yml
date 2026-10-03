@@ -8,6 +8,7 @@ on:
     paths:
       - 'Banana Claims Mod/**'
       - '.github/workflows/claims-26-3.yml'
+      - '.github/scripts/smoke_claims_26_3.py'
 
 permissions:
   contents: read
@@ -26,6 +27,8 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - uses: gradle/actions/wrapper-validation@v6
       - uses: actions/setup-java@v5
         with:
@@ -35,20 +38,24 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon --console=plain clean build
-      - name: Upload compile-only candidate (not production approval)
+      - name: Test built JAR on an isolated dedicated server
+        run: python3 ../.github/scripts/smoke_claims_26_3.py
+      - name: Upload startup-tested candidate (not production approval)
         uses: actions/upload-artifact@v7
         with:
-          name: BananaClaims-26.3-compile-candidate
-          path: |
-            Banana Claims Mod/build/libs/*.jar
-            !Banana Claims Mod/build/libs/*-sources.jar
+          name: BananaClaims-26.3-startup-tested-candidate
+          path: Banana Claims Mod/build/release-candidate/
           if-no-files-found: error
           retention-days: 14
-      - name: Upload diagnostic reports
-        if: failure()
+      - name: Upload test logs and diagnostic reports
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: BananaClaims-26.3-build-reports
-          path: Banana Claims Mod/build/reports/
+          name: BananaClaims-26.3-test-evidence
+          path: |
+            Banana Claims Mod/build/reports/
+            Banana Claims Mod/build/smoke-26.3/*.log
+            Banana Claims Mod/build/smoke-26.3/logs/
+            Banana Claims Mod/build/smoke-26.3/crash-reports/
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 14
