@@ -1,0 +1,122 @@
+name: Foxvale 26.3 mod builds
+on:
+  push:
+    branches: ['foxvale/itemflexer-player-ladder-26.3']
+    paths: ['foxvale-ports/**', '.github/workflows/foxvale-mods.yml']
+permissions:
+  contents: read
+jobs:
+  build:
+    name: Build ${{ matrix.mod }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        mod: [itemflexer, player-ladder]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: foxvale-ports
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Prepare pinned source and patches
+        run: python3 foxvale-ports/prepare.py
+      - name: Compile and run tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd foxvale-build/${{ matrix.mod }}
+          ./gradlew --no-daemon --console=plain build 2>&1 | tee build-output.log
+      - name: Package binaries, complete sources, licenses, and validation
+        env:
+          MOD_NAME: ${{ matrix.mod }}
+          BUILD_COMMIT: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, json, os, shutil, zipfile
+          import xml.etree.ElementTree as ET
+          name = os.environ['MOD_NAME']
+          project = Path('foxvale-build') / name
+          out = Path('dist')
+          out.mkdir()
+          jars = sorted((project/'build/libs').glob('*.jar'))
+          runtime_jars = [p for p in jars if not p.name.endswith('-sources.jar')]
+          if len(runtime_jars) != 1:
+              raise RuntimeError(f'Expected one installable JAR, got {runtime_jars}')
+          metadata = None
+          for jar in jars:
+              shutil.copy2(jar, out/jar.name)
+              if jar in runtime_jars:
+                  with zipfile.ZipFile(jar) as z:
+                      metadata = json.loads(z.read('fabric.mod.json'))
+                      if '${version}' in metadata['version']:
+                          raise RuntimeError('Unexpanded mod version')
+                      expected = 'itemflexer' if name == 'itemflexer' else 'modern_player_ladder'
+                      if metadata['id'] != expected:
+                          raise RuntimeError('Unexpected mod ID')
+          results = {'tests': 0, 'failures': 0, 'errors': 0, 'skipped': 0}
+          for path in (project/'build/test-results/test').glob('TEST-*.xml'):
+              root = ET.parse(path).getroot()
+              for key in results:
+                  results[key] += int(root.attrib.get(key, 0))
+          if results['failures'] or results['errors']:
+              raise RuntimeError(f'Tests did not pass: {results}')
+          if name == 'player-ladder' and results['tests'] < 5:
+              raise RuntimeError('Preference tests were not executed')
+          with zipfile.ZipFile(out/f'{name}-complete-source.zip', 'w', zipfile.ZIP_DEFLATED) as z:
+              for path in project.rglob('*'):
+                  rel = path.relative_to(project)
+                  if path.is_file() and not any(p in {'.git', '.gradle', 'build', 'run'} for p in rel.parts) and path.name != 'build-output.log':
+                      z.write(path, Path(name)/rel)
+          shutil.copy2(project/'FOXVALE-NOTICE.md', out/'FOXVALE-NOTICE.md')
+          shutil.copy2(project/'LICENSE', out/'LICENSE')
+          shutil.copy2(Path('foxvale-build')/f'{name}.patch', out/f'{name}.patch')
+          shutil.copy2(project/'build-output.log', out/'build-output.log')
+          if (project/'build/reports/tests').exists():
+              shutil.copytree(project/'build/reports/tests', out/'test-reports')
+          validation = {
+              'mod': name, 'target_minecraft': '26.3', 'build_commit': os.environ['BUILD_COMMIT'],
+              'compiled': True, 'gradle_build_success': True, 'unit_tests': results,
+              'metadata': metadata, 'live_server_tested': False,
+              'uploaded_to_foxvalesmp': False, 'server_restarted_or_stopped': False,
+          }
+          (out/'validation.json').write_text(json.dumps(validation, indent=2)+'\n')
+          (out/'INSTALL.txt').write_text(
+              'Unofficial Foxvale Minecraft 26.3 Fabric mod build.\n'
+              'Install the ordinary JAR only, not the sources JAR or source ZIP.\n'
+              'Build and unit-test results are in validation.json. Not live-server tested.\n'
+              'Requires Java 25, compatible Fabric Loader and Fabric API.\n'
+              'Before replacement, back up old JARs outside mods and preserve configuration/player data.\n'
+              'Never leave duplicate copies of the same mod ID in mods.\n'
+              'This package does not upload files, stop, restart, reload, or send commands to a server.\n'
+              'Stage installation only; activation awaits a separately authorized future restart.\n')
+          hashes = []
+          for path in sorted(out.rglob('*')):
+              if path.is_file():
+                  hashes.append(hashlib.sha256(path.read_bytes()).hexdigest()+'  '+path.relative_to(out).as_posix())
+          (out/'SHA256SUMS.txt').write_text('\n'.join(hashes)+'\n')
+          print(json.dumps(validation, indent=2))
+          PY
+      - name: Upload successful build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Foxvale-${{ matrix.mod }}-26.3
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Preserve diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Foxvale-${{ matrix.mod }}-diagnostics
+          path: |
+            foxvale-build/${{ matrix.mod }}/build-output.log
+            foxvale-build/${{ matrix.mod }}/build/reports/
+            foxvale-build/${{ matrix.mod }}/build/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
