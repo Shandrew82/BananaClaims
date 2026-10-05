@@ -214,7 +214,7 @@ No server restart, stop, command, or live upload is performed by this build reci
 '''
     write(folder/'FOXVALE-NOTICE.md', notice)
     run('git', 'add', '-N', '.', cwd=folder)
-    run('git', 'diff', '--check', cwd=folder)
+    run('git', '-c', 'core.whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol', 'diff', '--check', cwd=folder)
     patch = subprocess.check_output(['git', 'diff', '--binary'], cwd=folder)
     (ROOT/f'{name}.patch').write_bytes(patch)
 
