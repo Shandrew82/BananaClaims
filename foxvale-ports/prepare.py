@@ -43,6 +43,8 @@ ladder = ROOT / 'player-ladder'
 java_path = item / 'src/main/java/dev/silverandro/itemflexer/ItemFlexer.java'
 text = java_path.read_text()
 replacements = {
+    'import eu.pb4.placeholders.api.PlaceholderContext;': 'import eu.pb4.placeholders.api.ServerPlaceholderContext;',
+    'Placeholders.register(': 'Placeholders.registerServer(',
     'net.minecraft.item.ItemStack': 'net.minecraft.world.item.ItemStack',
     'net.minecraft.item.Items': 'net.minecraft.world.item.Items',
     'net.minecraft.server.command.CommandManager': 'net.minecraft.commands.Commands',
@@ -56,8 +58,9 @@ replacements = {
     'Identifier.of(': 'Identifier.fromNamespaceAndPath(',
     'stack.toHoverableText()': 'stack.getDisplayName()',
     'Text.empty()': 'Component.empty()',
-    'Text.of(': 'Component.literal(',
-    'Text text;': 'Component text;',
+    'Text.of(this.config.chatMessageWithCount)': 'this.config.chatMessageWithCount',
+    'Text.of(this.config.chatMessage)': 'this.config.chatMessage',
+    'Text text;': 'String text;',
     'Text message =': 'Component message =',
     '.getPlayerOrThrow()': '.getPlayerOrException()',
     '.getMainHandStack()': '.getMainHandItem()',
@@ -66,7 +69,9 @@ replacements = {
     '.getPlayerManager().getPlayerList()': '.getPlayerList().getPlayers()',
     'other.sendMessage(message, false)': 'other.sendSystemMessage(message)',
     'public static ItemStack stack;': 'public static ItemStack stack = ItemStack.EMPTY;',
-    'cooldowns.get(ctx.player()) / 20f': 'cooldowns.getOrDefault(ctx.player(), 0) / 20f',
+    'cooldowns.get(ctx.player()) / 20f': 'cooldowns.getOrDefault(ctx.serverPlayer(), 0) / 20f',
+    'Placeholders.parseText(Component.empty().append(config.failureOnCooldown), PlaceholderContext.of(player))': 'Placeholders.SERVER_PLACEHOLDER_PARSER.parseComponent(config.failureOnCooldown, ServerPlaceholderContext.of(player).asParserContext())',
+    'Placeholders.parseText(text, PlaceholderContext.of(player))': 'Placeholders.SERVER_PLACEHOLDER_PARSER.parseComponent(text, ServerPlaceholderContext.of(player).asParserContext())',
 }
 for old, new in replacements.items():
     if old not in text:
